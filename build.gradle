@@ -1,0 +1,37 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '4.0.5'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'net.ddns.adambravo79'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    toolchain { languageVersion = JavaLanguageVersion.of(21) }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    
+    // Dependências Modulares v9.5.0
+
+    implementation 'org.telegram:telegrambots-springboot-longpolling-starter:9.5.0'
+    implementation 'org.telegram:telegrambots-client:9.5.0'
+    implementation 'net.bramp.ffmpeg:ffmpeg:0.8.0'
+    implementation 'io.projectreactor:reactor-core'
+
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+} 
+
+tasks.named('test') {
+    useJUnitPlatform()
+    // Isso evita o erro de "no tests discovered"
+    failOnNoDiscoveredTests = false 
+}
