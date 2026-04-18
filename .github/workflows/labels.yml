@@ -1,13 +1,18 @@
-name: Sync Labels
+name: Labels
 
 on:
   push:
-    paths:
-      - ".github/labels.yml"
+    branches:
+      - main
+
+permissions:
+  contents: read
+  issues: write   # 🔥 ESSENCIAL
 
 jobs:
   labels:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v3
 
