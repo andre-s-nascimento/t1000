@@ -1,13 +1,14 @@
-name: Labels
+name: Sync Labels
 
 on:
   push:
-    branches:
-      - main
+    paths:
+      - '.github/labels.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
-  issues: write   # 🔥 ESSENCIAL
+  issues: write   # 👈 ESSA LINHA RESOLVE
 
 jobs:
   labels:
