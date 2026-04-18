@@ -114,6 +114,16 @@ Este projeto explora:
 
 ---
 
+## 📍 Roadmap
+
+- [ ] v1.1.0 - Stability
+- [ ] v1.2.0 - Performance
+- [ ] v1.3.0 - UX
+- [ ] v1.4.0 - DevOps
+- [ ] v2.0.0 - Scalability
+
+---
+
 ## 👨‍💻 Autor
 
 Andre Nascimento
