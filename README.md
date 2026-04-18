@@ -1,54 +1,87 @@
 # 🎬 Tmill Bot
 
-Bot para Telegram desenvolvido em Java com Spring Boot que permite:
+<p align="center">
+  <b>Bot inteligente para Telegram que busca filmes no TMDB e transcreve áudios com IA</b>
+</p>
 
-* 🔎 Buscar informações de filmes via TMDB
-* 🎙️ Transcrever áudios em português usando IA (Whisper)
-* ✨ Refinar texto automaticamente com LLM
+<p align="center">
+
+![Java](https://img.shields.io/badge/Java-21-orange)
+![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.x-brightgreen)
+![Build](https://img.shields.io/badge/build-passing-success)
+![Tests](https://img.shields.io/badge/tests-coming_soon-yellow)
+![License](https://img.shields.io/badge/license-MIT-blue)
+![Status](https://img.shields.io/badge/status-v1.0.0-blueviolet)
+
+</p>
 
 ---
 
-## 🚀 Tecnologias
+## 🚀 Sobre o Projeto
 
-* Java 21
-* Spring Boot 4
-* Telegram Bots API
-* TMDB API
-* Groq API (Whisper + Llama)
-* FFmpeg
-* Virtual Threads (Project Loom)
+O **Tmill Bot** é um bot para Telegram que combina:
+
+- 🎥 Busca de filmes via API do TMDB  
+- 🎙️ Transcrição de áudio com IA via Groq  
+- 🧠 Refinamento de texto com modelos LLM  
+- ⚙️ Backend moderno com Spring Boot + Java 21 (Virtual Threads)
+
+---
+
+## ✨ Funcionalidades
+
+### 🔎 Busca de Filmes
+- Buscar filmes por nome
+- Exibir detalhes:
+  - título
+  - ano
+  - sinopse
+  - elenco
+  - onde assistir
+
+### 🎧 Transcrição de Áudio
+- Recebe áudio via Telegram
+- Converte com FFmpeg
+- Transcreve com IA
+- Refina o texto automaticamente
 
 ---
 
 ## 🧠 Arquitetura
 
-O projeto segue uma arquitetura em camadas:
-
-```
-Controller → Service → Client → API externa
-```
-
-Além disso, possui um pipeline assíncrono para áudio:
-
-```
-Áudio → Conversão → Transcrição → Refinamento
-```
+Telegram → Controller → Services → Clients → APIs externas
 
 ---
 
-## ⚙️ Configuração
+## 🏗️ Tecnologias
 
-Crie as variáveis de ambiente:
+- Java 21
+- Spring Boot 3
+- Telegram Bots API
+- TMDB API
+- Groq (Whisper + LLM)
+- FFmpeg
 
+---
+
+## ⚙️ Como rodar o projeto
+
+### 1. Clone o repositório
+
+```bash
+git clone https://github.com/seu-usuario/tmill-bot.git
+cd tmill-bot
 ```
+
+### 2. Configure variáveis de ambiente
+
+```bash
 TELEGRAM_BOT_TOKEN=seu_token
-TMDB_READ_TOKEN=seu_token
-GROQ_API_KEY=seu_token
+TMDB_API_KEY=sua_chave
+GROQ_API_KEY=sua_chave
 ```
 
----
-
-## ▶️ Executando o projeto
+### 3. Execute
 
 ```bash
 ./gradlew bootRun
@@ -56,61 +89,30 @@ GROQ_API_KEY=seu_token
 
 ---
 
-## 💬 Como usar
+## 🗺️ Roadmap
 
-No Telegram:
-
-### Buscar filme
-
-```
-t1000 buscar matrix
-```
-
-### Enviar áudio
-
-* Envie um áudio em português
-* O bot irá transcrever e refinar automaticamente
+- [ ] v1.1.0 — Stability & Hardening  
+- [ ] v1.2.0 — Performance & Testing  
+- [ ] v1.3.0 — UX Improvements  
+- [ ] v1.4.0 — DevOps  
+- [ ] v2.0.0 — Scalability  
 
 ---
 
-## 🧪 Status do projeto
+## 📦 Estrutura
 
-Versão: **1.0.0**
-
-✔ Funcional
-✔ Pipeline de áudio completo
-✔ Integração com APIs externas
-
----
-
-## ⚠️ Limitações atuais
-
-* Sem cache de respostas
-* Sem rate limiting
-* Processamento de áudio sem fila
-* Testes automatizados mínimos
+src/main/java
+├── controller
+├── service
+├── client
+├── config
+└── util
 
 ---
 
-## 🚀 Próximos passos
+## 📄 Licença
 
-* Cache (Redis ou Caffeine)
-* Rate limiting
-* Fila de processamento de áudio
-* Observabilidade (metrics + logs)
-* Clean Architecture
-
----
-
-## 📚 Aprendizados
-
-Este projeto explora:
-
-* Integração com APIs externas
-* Processamento assíncrono
-* Virtual Threads
-* Pipeline de dados com IA
-* Arquitetura em camadas
+MIT
 
 ---
 
