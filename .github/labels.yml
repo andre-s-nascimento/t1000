@@ -1,6 +1,6 @@
 - name: bug
   color: d73a4a
-  description: Algo quebrado
+  description: Algo parou de funcionar
 
 - name: enhancement
   color: 2ea44f
