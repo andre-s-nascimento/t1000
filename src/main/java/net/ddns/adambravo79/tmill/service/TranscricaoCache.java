@@ -11,7 +11,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * o TelegramController saiba qual texto associar ao clique.
  *
  * Simples e intencional: não persiste, não tem TTL complexo.
- * Se o bot reiniciar, o estado se perde — comportamento aceitável para este caso.
+ * Se o bot reiniciar, o estado se perde — comportamento aceitável para este
+ * caso.
  */
 @Log4j2
 @Component

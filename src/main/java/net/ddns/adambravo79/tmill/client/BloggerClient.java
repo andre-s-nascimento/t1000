@@ -11,7 +11,8 @@ import java.util.Map;
 /**
  * Cliente para a API v3 do Google Blogger.
  * Usa refresh_token salvo em variável de ambiente para obter access tokens.
- * Não requer nenhum fluxo interativo de login — autorização feita uma única vez.
+ * Não requer nenhum fluxo interativo de login — autorização feita uma única
+ * vez.
  */
 @Log4j2
 @Component
@@ -37,6 +38,10 @@ public class BloggerClient {
         this.clientSecret = clientSecret;
         this.refreshToken = refreshToken;
         this.blogId = blogId;
+        log.info("BloggerClient init — clientId={}, refreshToken={}, blogId={}",
+                clientId.substring(0, 6) + "...",
+                refreshToken.isEmpty() ? "VAZIO!" : refreshToken.substring(0, 6) + "...",
+                blogId);
     }
 
     /**
@@ -46,17 +51,16 @@ public class BloggerClient {
     private String obterAccessToken() {
         log.debug("Blogger: Renovando access token via refresh_token...");
         try {
-            var payload = Map.of(
-                    "client_id", clientId,
-                    "client_secret", clientSecret,
-                    "refresh_token", refreshToken,
-                    "grant_type", "refresh_token");
+            String formBody = "client_id=" + clientId
+                    + "&client_secret=" + clientSecret
+                    + "&refresh_token=" + refreshToken
+                    + "&grant_type=refresh_token";
 
             @SuppressWarnings("unchecked")
             Map<String, Object> response = restClient.post()
                     .uri(TOKEN_URL)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(payload)
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                    .body(formBody)
                     .retrieve()
                     .body(Map.class);
 
