@@ -36,3 +36,5 @@ out/
 ### VS Code ###
 .vscode/
 .env
+obter-refresh-token.sh
+obter-refresh-token.sh
