@@ -33,6 +33,7 @@ import java.util.Optional;
 @Component
 public class TelegramController implements LongPollingSingleThreadUpdateConsumer {
 
+    private static final int TELEGRAM_LIMIT = 4000;
     private final TelegramClient telegramClient;
     private final MovieService movieService;
     private final AudioPipelineService orchestrationService;
@@ -196,32 +197,45 @@ public class TelegramController implements LongPollingSingleThreadUpdateConsumer
      * Envia a mensagem do texto refinado COM os botões de ação do Blogger.
      */
     private void enviarRespostaComBotoesBlogger(long chatId, String texto) {
-        List<InlineKeyboardRow> rows = new ArrayList<>();
+        log.info("Enviando mensagem com {} caracteres", texto.length());
+        List<String> partes = dividirMensagem(texto, TELEGRAM_LIMIT);
 
-        InlineKeyboardRow row = new InlineKeyboardRow();
-        row.add(InlineKeyboardButton.builder()
-                .text("📝 Publicar como Rascunho")
-                .callbackData("blogger:publicar")
-                .build());
-        row.add(InlineKeyboardButton.builder()
-                .text("❌ Não publicar")
-                .callbackData("blogger:cancelar")
-                .build());
-        rows.add(row);
+        for (int i = 0; i < partes.size(); i++) {
+            String parte = partes.get(i);
 
-        SendMessage sm = SendMessage.builder()
-                .chatId(String.valueOf(chatId))
-                .text(texto)
-                .parseMode("Markdown")
-                .replyMarkup(InlineKeyboardMarkup.builder().keyboard(rows).build())
-                .build();
+            boolean ultima = (i == partes.size() - 1);
 
-        try {
-            telegramClient.execute(sm);
-        } catch (Exception e) {
-            log.error("Erro ao enviar mensagem com botões do Blogger", e);
-            // Fallback sem botões
-            enviarResposta(chatId, texto);
+            try {
+                SendMessage.SendMessageBuilder builder = SendMessage.builder()
+                        .chatId(String.valueOf(chatId))
+                        .text(parte)
+                        .parseMode("Markdown");
+
+                if (ultima) {
+                    List<InlineKeyboardRow> rows = new ArrayList<>();
+                    InlineKeyboardRow row = new InlineKeyboardRow();
+
+                    row.add(InlineKeyboardButton.builder()
+                            .text("📝 Publicar como Rascunho")
+                            .callbackData("blogger:publicar")
+                            .build());
+
+                    row.add(InlineKeyboardButton.builder()
+                            .text("❌ Não publicar")
+                            .callbackData("blogger:cancelar")
+                            .build());
+
+                    rows.add(row);
+
+                    builder.replyMarkup(
+                            InlineKeyboardMarkup.builder().keyboard(rows).build());
+                }
+
+                telegramClient.execute(builder.build());
+
+            } catch (Exception e) {
+                log.error("Erro ao enviar mensagem com botões", e);
+            }
         }
     }
 
@@ -252,6 +266,11 @@ public class TelegramController implements LongPollingSingleThreadUpdateConsumer
         boolean isOwner = userId == ownerId;
 
         orchestrationService.processarFluxoAudio(fileOpt.get(), chatId, (texto, isUltima) -> {
+
+            if (texto.length() > TELEGRAM_LIMIT) {
+                enviarResposta(chatId, "📄 Transcrição longa, enviando em partes...");
+            }
+
             if (isUltima && isOwner) {
                 enviarRespostaComBotoesBlogger(chatId, texto);
             } else {
@@ -321,17 +340,23 @@ public class TelegramController implements LongPollingSingleThreadUpdateConsumer
     // -------------------------------------------------------------------------
 
     private void enviarResposta(long chatId, String texto) {
-        try {
-            telegramClient.execute(SendMessage.builder()
-                    .chatId(String.valueOf(chatId))
-                    .text(texto)
-                    .parseMode("Markdown")
-                    .build());
-        } catch (Exception e) {
+
+        log.info("Enviando mensagem com {} caracteres", texto.length());
+        List<String> partes = dividirMensagem(texto, TELEGRAM_LIMIT);
+
+        for (String parte : partes) {
             try {
-                telegramClient.execute(new SendMessage(String.valueOf(chatId), texto));
-            } catch (Exception ex) {
-                log.error("Falha total ao enviar mensagem para chatId={}", chatId, ex);
+                telegramClient.execute(SendMessage.builder()
+                        .chatId(String.valueOf(chatId))
+                        .text(parte)
+                        .parseMode("Markdown")
+                        .build());
+            } catch (Exception e) {
+                try {
+                    telegramClient.execute(new SendMessage(String.valueOf(chatId), parte));
+                } catch (Exception ex) {
+                    log.error("Falha total ao enviar mensagem para chatId={}", chatId, ex);
+                }
             }
         }
     }
@@ -348,5 +373,27 @@ public class TelegramController implements LongPollingSingleThreadUpdateConsumer
             log.warn("Erro ao enviar foto, enviando apenas texto.");
             enviarResposta(chatId, legenda);
         }
+    }
+
+    private List<String> dividirMensagem(String texto, int limite) {
+        List<String> partes = new ArrayList<>();
+
+        int inicio = 0;
+        while (inicio < texto.length()) {
+            int fim = Math.min(inicio + limite, texto.length());
+
+            // tenta quebrar em espaço para não cortar palavra
+            if (fim < texto.length()) {
+                int ultimoEspaco = texto.lastIndexOf(" ", fim);
+                if (ultimoEspaco > inicio) {
+                    fim = ultimoEspaco;
+                }
+            }
+
+            partes.add(texto.substring(inicio, fim).trim());
+            inicio = fim;
+        }
+
+        return partes;
     }
 }
