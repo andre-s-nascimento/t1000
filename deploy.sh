@@ -50,7 +50,7 @@ load_env() {
 # ==============================
 build_image() {
     log_info "Construindo imagem Docker: $DOCKER_IMAGE"
-    docker build -t "$DOCKER_IMAGE" .
+    docker build --pull -t "$DOCKER_IMAGE" .
     if [ $? -ne 0 ]; then
         log_error "Falha no build da imagem"
         exit 1
