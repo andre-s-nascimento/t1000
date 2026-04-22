@@ -18,17 +18,18 @@ repositories {
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     
-    // Dependências Modulares v9.5.0
+    // Fixamos as versões que o Gradle não encontrou sozinho
+    compileOnly 'org.projectlombok:lombok:1.18.34'
+    annotationProcessor 'org.projectlombok:lombok:1.18.34'
+    implementation 'io.projectreactor:reactor-core:3.7.0'
 
+    // Suas libs do Telegram (Mantenha as versões que você definiu)
     implementation 'org.telegram:telegrambots-springboot-longpolling-starter:9.5.0'
     implementation 'org.telegram:telegrambots-client:9.5.0'
     implementation 'net.bramp.ffmpeg:ffmpeg:0.8.0'
-    implementation 'io.projectreactor:reactor-core'
 
-    compileOnly 'org.projectlombok:lombok'
-    annotationProcessor 'org.projectlombok:lombok'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
-} 
+}
 
 tasks.named('test') {
     useJUnitPlatform()
