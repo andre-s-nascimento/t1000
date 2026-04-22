@@ -6446,3 +6446,8 @@ node_modules/yargs-parser/CHANGELOG.md
 node_modules/yargs-parser/LICENSE.txt
 node_modules/yargs-parser/package.json
 node_modules/yargs-parser/README.md
+node_modules/brace-expansion/.github/FUNDING.yml
+node_modules/minimatch/node_modules/brace-expansion/index.js
+node_modules/minimatch/node_modules/brace-expansion/LICENSE
+node_modules/minimatch/node_modules/brace-expansion/package.json
+node_modules/minimatch/node_modules/brace-expansion/README.md
