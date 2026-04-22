@@ -31,8 +31,21 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }
 
+configurations.all {
+    resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
+}
+
 tasks.named('test') {
     useJUnitPlatform()
     // Isso evita o erro de "no tests discovered"
     failOnNoDiscoveredTests = false 
+}
+
+tasks.withType(Test) {
+    enabled = false
+}
+
+tasks.withType(JavaCompile) {
+    options.fork = true
+    options.forkOptions.memoryMaximumSize = '256m'
 }

@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e  # para o script em qualquer erro
+
 # ==============================
 # 🔧 CONFIGURAÇÕES
 # ==============================
@@ -50,20 +52,24 @@ load_env() {
 # ==============================
 build_image() {
     log_info "Construindo imagem Docker: $DOCKER_IMAGE"
-    docker build --pull -t "$DOCKER_IMAGE" .
-    if [ $? -ne 0 ]; then
-        log_error "Falha no build da imagem"
+    docker build -t "$DOCKER_IMAGE" . || {
+        log_error "Falha no build"
         exit 1
-    fi
+    }
 }
 
 # ==============================
 # 🧹 LIMPEZA
 # ==============================
 stop_container() {
-    log_info "Parando container antigo (se existir)..."
+    log_info "🛑 Parando container antigo (se existir)..."
     docker stop "$APP_NAME" &>/dev/null || true
     docker rm "$APP_NAME" &>/dev/null || true
+}
+
+cleanup_docker() {
+    log_info "🧹 Limpando imagens dangling..."
+    docker image prune -f &>/dev/null || true
 }
 
 # ==============================
@@ -79,14 +85,14 @@ run_container() {
         --restart unless-stopped \
         --env-file .env \
         -v "$DATA_PATH:/app/temp_audio" \
-        "$DOCKER_IMAGE"
+        --memory="700m" \
+        --cpus="0.8" \
+        "$DOCKER_IMAGE" || {
+            log_error "Erro ao iniciar container"
+            exit 1
+        }
 
-    if [ $? -eq 0 ]; then
-        log_info "Container iniciado com sucesso!"
-    else
-        log_error "Erro ao iniciar container"
-        exit 1
-    fi
+    log_info "✅ Container rodando!"
 }
 
 # ==============================
@@ -116,30 +122,44 @@ main() {
     load_env
 
     case "${1:-deploy}" in
+
         deploy)
+            log_info "Modo: deploy completo"
             build_image
             stop_container
             run_container
+            cleanup_docker
             show_status
             show_logs
             ;;
+
+        build)
+            log_info "Modo: build only"
+            build_image
+            ;;
+
         restart)
+            log_info "Modo: restart"
             stop_container
             run_container
             show_status
             ;;
+
         stop)
             stop_container
             log_info "Container parado"
             ;;
+
         logs)
             logs_follow
             ;;
+
         status)
             show_status
             ;;
+
         *)
-            echo "Uso: $0 {deploy|restart|stop|logs|status}"
+            echo "Uso: $0 {deploy|build|restart|stop|logs|status}"
             exit 1
             ;;
     esac
