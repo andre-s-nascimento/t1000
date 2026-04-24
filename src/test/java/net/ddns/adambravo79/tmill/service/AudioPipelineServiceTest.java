@@ -1,85 +1,114 @@
 package net.ddns.adambravo79.tmill.service;
 
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import org.junit.jupiter.api.Test;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.BiConsumer;
 
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import net.ddns.adambravo79.tmill.client.GroqClient;
-import net.ddns.adambravo79.tmill.model.MovieRecord;
-import tools.jackson.databind.ObjectMapper;
-
+import static org.mockito.Mockito.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
-@ExtendWith(MockitoExtension.class)
 class AudioPipelineServiceTest {
 
-    @Mock
-    private AudioService audioService;
+        @Test
+        void deveProcessarFluxoCompleto() {
+                var audio = mock(AudioService.class);
+                var groq = mock(net.ddns.adambravo79.tmill.client.GroqClient.class);
+                var cache = mock(TranscricaoCache.class);
 
-    @Mock
-    private GroqClient groqClient;
+                var service = new AudioPipelineService(audio, groq, cache);
 
-    @Mock
-    private TranscricaoCache cache;
+                File input = spy(new File("a.oga"));
+                File wav = spy(new File("a.wav"));
 
-    @InjectMocks
-    private AudioPipelineService service;
+                when(audio.converterParaWav(input))
+                                .thenReturn(CompletableFuture.completedFuture(wav));
 
-    @Test
-    void deveExecutarPipelineCompleto() {
-        File oga = new File("audio.oga");
-        File wav = new File("audio.wav");
+                when(groq.transcrever(wav)).thenReturn("bruto");
+                when(groq.refinarTexto("bruto")).thenReturn("refinado");
 
-        when(audioService.converterParaWav(oga))
-                .thenReturn(CompletableFuture.completedFuture(wav));
+                BiConsumer<String, Boolean> callback = mock(BiConsumer.class);
 
-        when(groqClient.transcrever(wav))
-                .thenReturn("texto bruto");
+                service.processarFluxoAudio(input, 1L, callback);
 
-        when(groqClient.refinarTexto("texto bruto"))
-                .thenReturn("texto refinado");
+                verify(callback).accept(contains("Bruto"), eq(false));
+                verify(callback).accept(contains("Refinado"), eq(true));
+                verify(cache).salvar(1L, "refinado");
 
-        List<String> mensagens = new ArrayList<>();
+                verify(wav).delete();
+                verify(input).delete();
+        }
 
-        service.processarFluxoAudio(oga, 1L, (msg, ultima) -> {
-            mensagens.add(msg);
-        });
+        @Test
+        void deveFalharQuandoConversaoFalhar() {
+                var audio = mock(AudioService.class);
+                var groq = mock(net.ddns.adambravo79.tmill.client.GroqClient.class);
+                var cache = mock(TranscricaoCache.class);
 
-        assertThat(mensagens).hasSize(2);
-        assertThat(mensagens.get(0)).contains("Bruto");
-        assertThat(mensagens.get(1)).contains("Refinado");
+                var service = new AudioPipelineService(audio, groq, cache);
 
-        verify(cache).salvar(1L, "texto refinado");
-    }
+                File input = spy(new File("a.oga"));
 
-    @Test
-    void deveMapearJsonParaMovieRecord() throws Exception {
-        String json = """
-                {
-                  "id": 1,
-                  "title": "Duna",
-                  "release_date": "2021-01-01",
-                  "vote_average": 8.5,
-                  "poster_path": "/img",
-                  "origin_country": ["US"]
-                }
-                """;
+                when(audio.converterParaWav(input))
+                                .thenReturn(CompletableFuture.failedFuture(new RuntimeException()));
 
-        ObjectMapper mapper = new ObjectMapper();
+                BiConsumer<String, Boolean> callback = mock(BiConsumer.class);
 
-        MovieRecord record = mapper.readValue(json, MovieRecord.class);
+                service.processarFluxoAudio(input, 1L, callback);
 
-        assertThat(record.title()).isEqualTo("Duna");
-        assertThat(record.originCountry()).contains("US");
-    }
+                verify(callback).accept(contains("Falha"), eq(false));
+                verify(input).delete();
+        }
+
+        @Test
+        void deveFalharQuandoTranscricaoFalhar() {
+                var audio = mock(AudioService.class);
+                var groq = mock(net.ddns.adambravo79.tmill.client.GroqClient.class);
+                var cache = mock(TranscricaoCache.class);
+
+                var service = new AudioPipelineService(audio, groq, cache);
+
+                File input = spy(new File("a.oga"));
+                File wav = spy(new File("a.wav"));
+
+                when(audio.converterParaWav(input))
+                                .thenReturn(CompletableFuture.completedFuture(wav));
+
+                when(groq.transcrever(wav))
+                                .thenThrow(new RuntimeException());
+
+                BiConsumer<String, Boolean> callback = mock(BiConsumer.class);
+
+                service.processarFluxoAudio(input, 1L, callback);
+
+                verify(callback).accept(contains("Falha"), eq(false));
+                verify(input).delete();
+        }
+
+        @Test
+        void deveFalharQuandoRefinoFalhar() {
+                var audio = mock(AudioService.class);
+                var groq = mock(net.ddns.adambravo79.tmill.client.GroqClient.class);
+                var cache = mock(TranscricaoCache.class);
+
+                var service = new AudioPipelineService(audio, groq, cache);
+
+                File input = spy(new File("a.oga"));
+                File wav = spy(new File("a.wav"));
+
+                when(audio.converterParaWav(input))
+                                .thenReturn(CompletableFuture.completedFuture(wav));
+
+                when(groq.transcrever(wav)).thenReturn("bruto");
+                when(groq.refinarTexto("bruto"))
+                                .thenThrow(new RuntimeException());
+
+                BiConsumer<String, Boolean> callback = mock(BiConsumer.class);
+
+                service.processarFluxoAudio(input, 1L, callback);
+
+                verify(callback).accept(contains("Falha"), eq(false));
+                verify(input).delete();
+        }
 }
