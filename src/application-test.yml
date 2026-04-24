@@ -1,0 +1,11 @@
+tmdb:
+  token: fake
+  api:
+    url: http://localhost
+
+groq:
+  api:
+    key: fake
+
+bot:
+  token: fake
