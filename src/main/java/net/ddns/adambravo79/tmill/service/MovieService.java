@@ -3,7 +3,7 @@ package net.ddns.adambravo79.tmill.service;
 import lombok.extern.log4j.Log4j2;
 import net.ddns.adambravo79.tmill.client.TmdbClient;
 import net.ddns.adambravo79.tmill.model.MovieOrchestrationResponse;
-import net.ddns.adambravo79.tmill.model.MovieSearchResponse; // Import correto
+import net.ddns.adambravo79.tmill.model.MovieSearchResponse;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;

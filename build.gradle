@@ -2,10 +2,12 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '4.0.5'
     id 'io.spring.dependency-management' version '1.1.7'
+    id 'jacoco'
 }
 
+
 group = 'net.ddns.adambravo79'
-version = '0.0.1-SNAPSHOT'
+version = '1.0.0'
 
 java {
     toolchain { languageVersion = JavaLanguageVersion.of(21) }
@@ -27,25 +29,57 @@ dependencies {
     implementation 'org.telegram:telegrambots-springboot-longpolling-starter:9.5.0'
     implementation 'org.telegram:telegrambots-client:9.5.0'
     implementation 'net.bramp.ffmpeg:ffmpeg:0.8.0'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.mockito:mockito-core'
+    testImplementation 'org.mockito:mockito-junit-jupiter'
+    testImplementation 'org.assertj:assertj-core'
 }
 
 configurations.all {
     resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
 }
 
-tasks.named('test') {
-    useJUnitPlatform()
-    // Isso evita o erro de "no tests discovered"
-    failOnNoDiscoveredTests = false 
-}
-
-tasks.withType(Test) {
-    enabled = false
-}
-
 tasks.withType(JavaCompile) {
     options.fork = true
     options.forkOptions.memoryMaximumSize = '256m'
 }
+
+jacoco {
+    toolVersion = "0.8.11"
+}
+
+test {
+    useJUnitPlatform()
+    finalizedBy jacocoTestReport
+}
+
+jacocoTestReport {
+    reports {
+        xml.required = true
+        html.required = true
+    }
+
+    afterEvaluate {
+        classDirectories.setFrom(files(classDirectories.files.collect {
+            fileTree(dir: it, exclude: [
+                'net/ddns/adambravo79/tmill/client/**',
+                'net/ddns/adambravo79/tmill/config/**',
+                'net/ddns/adambravo79/tmill/TmillApplication*'
+            ])
+        }))
+    }
+}
+
+jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            limit {
+                minimum = 0.70
+            }
+        }
+    }
+}
+
+check.dependsOn jacocoTestCoverageVerification

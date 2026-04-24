@@ -21,28 +21,17 @@ public class AudioService {
      */
     @Async
     public CompletableFuture<File> converterParaWav(File ogaFile) {
-        // Gera o nome do arquivo .wav na mesma pasta temporária
         File wavFile = new File(ogaFile.getAbsolutePath().replace(".oga", ".wav"));
-
         try {
-            // Comando FFmpeg configurado para o padrão que o Groq/OpenAI prefere (16000Hz,
-            // Mono)
             ProcessBuilder pb = new ProcessBuilder(
                     "ffmpeg", "-y", "-i", ogaFile.getAbsolutePath(),
-                    "-ar", "16000",
-                    "-ac", "1",
-                    wavFile.getAbsolutePath());
-
-            // Redireciona erros para o log do Spring para facilitar debug na OCI
+                    "-ar", "16000", "-ac", "1", wavFile.getAbsolutePath());
             pb.redirectErrorStream(true);
-
             log.info("FFmpeg: Iniciando conversão de {}...", ogaFile.getName());
 
-            Process p = pb.start();
+            Process p = startProcess(pb); // ✅ chamada ao método protegido
 
-            // Timeout de 30s para evitar processos zumbis na OCI
             boolean finished = p.waitFor(30, TimeUnit.SECONDS);
-
             if (finished && p.exitValue() == 0) {
                 log.info("FFmpeg: Conversão concluída com sucesso.");
                 return CompletableFuture.completedFuture(wavFile);
@@ -54,5 +43,10 @@ public class AudioService {
             log.error("Erro crítico no AudioService", e);
             return CompletableFuture.failedFuture(e);
         }
+    }
+
+    // 👇 ADICIONE ESTE MÉTODO
+    protected Process startProcess(ProcessBuilder pb) throws Exception {
+        return pb.start();
     }
 }

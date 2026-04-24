@@ -5,6 +5,7 @@ import net.ddns.adambravo79.tmill.client.BloggerClient;
 import net.ddns.adambravo79.tmill.model.MovieRecord;
 import net.ddns.adambravo79.tmill.service.AudioPipelineService;
 import net.ddns.adambravo79.tmill.service.MovieService;
+import net.ddns.adambravo79.tmill.service.TelegramFileService;
 import net.ddns.adambravo79.tmill.service.TranscricaoCache;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -39,6 +40,7 @@ public class TelegramController implements LongPollingSingleThreadUpdateConsumer
     private final AudioPipelineService orchestrationService;
     private final BloggerClient bloggerClient;
     private final TranscricaoCache transcricaoCache;
+    private final TelegramFileService fileService;
 
     @Value("${t1000.features.transcription-enabled:false}")
     private boolean transcriptionEnabled;
@@ -49,16 +51,20 @@ public class TelegramController implements LongPollingSingleThreadUpdateConsumer
     @Value("${telegram.owner-id}")
     private long ownerId;
 
-    public TelegramController(@Value("${bot.token}") String botToken,
+    public TelegramController(
+            @Value("${bot.token}") String botToken,
             MovieService movieService,
             AudioPipelineService orchestrationService,
             BloggerClient bloggerClient,
-            TranscricaoCache transcricaoCache) {
+            TranscricaoCache transcricaoCache,
+            TelegramFileService fileService) {
+
         this.telegramClient = new OkHttpTelegramClient(botToken);
         this.movieService = movieService;
         this.orchestrationService = orchestrationService;
         this.bloggerClient = bloggerClient;
         this.transcricaoCache = transcricaoCache;
+        this.fileService = fileService;
     }
 
     /**
@@ -253,7 +259,7 @@ public class TelegramController implements LongPollingSingleThreadUpdateConsumer
                 ? message.getVoice().getFileId()
                 : message.getAudio().getFileId();
 
-        Optional<File> fileOpt = baixarArquivoTelegram(fileId);
+        Optional<File> fileOpt = fileService.baixarArquivo(telegramClient, fileId);
 
         if (fileOpt.isEmpty()) {
             enviarResposta(chatId, "⚠️ Não consegui baixar o áudio.");
