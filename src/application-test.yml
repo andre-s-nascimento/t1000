@@ -9,3 +9,7 @@ groq:
 
 bot:
   token: fake
+
+telegram:
+  bot:
+    enabled: false # Desativa o polling no ambiente de teste  

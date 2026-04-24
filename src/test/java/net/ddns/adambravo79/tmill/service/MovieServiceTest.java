@@ -41,44 +41,43 @@ class MovieServiceTest {
         void deveFormatarRespostaCompleta() {
                 Long id = 1L;
 
-                when(tmdbClient.pesquisarFilme("duna"))
+                when(tmdbClient.pesquisarFilme("agente secreto"))
                                 .thenReturn(new MovieSearchResponse(1, 1, 1,
                                                 List.of(new MovieRecord(
                                                                 id,
-                                                                "Duna",
-                                                                "2021-01-01",
+                                                                "O Agente Secreto",
+                                                                "2026-01-01",
                                                                 "desc",
                                                                 10.0,
                                                                 8.5,
                                                                 "/img",
-                                                                List.of("US") // 👈 ESSENCIAL pro teste da bandeira
-                                                ))));
+                                                                List.of("BR")))));
 
                 when(tmdbClient.buscarDetalhes(id))
                                 .thenReturn(new MovieRecord(
                                                 id,
-                                                "Duna",
-                                                "2021-01-01",
+                                                "O Agente Secreto",
+                                                "2026-01-01",
                                                 "desc",
                                                 10.0,
                                                 8.5,
                                                 "/img",
-                                                List.of("US")));
+                                                List.of("BR")));
 
                 when(tmdbClient.buscarElenco(id))
-                                .thenReturn(List.of(new CastRecord("Timothée", "Paul")));
+                                .thenReturn(List.of(new CastRecord("Wagner Moura", "Marcelo")));
 
                 when(tmdbClient.buscarOndeAssistir(id))
                                 .thenReturn("Netflix");
 
-                var result = movieService.executarBuscaFormatada("duna");
+                var result = movieService.executarBuscaFormatada("agente secreto");
 
                 assertThat(result.textoFormatado())
-                                .contains("DUNA")
-                                .contains("2021")
+                                .contains("O AGENTE SECRETO")
+                                .contains("2026")
                                 .contains("Netflix")
-                                .contains("Timothée")
-                                .matches("(?s).*🇺🇸.*");
+                                .contains("Wagner")
+                                .matches("(?s).*🇧🇷.*");
 
                 assertThat(result.urlFoto())
                                 .contains("image.tmdb.org");
