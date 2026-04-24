@@ -12,6 +12,7 @@
 ![Tests](https://img.shields.io/badge/tests-coming_soon-yellow)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Status](https://img.shields.io/badge/status-v1.0.0-blueviolet)
+![CI](https://github.com/SEU_USER/SEU_REPO/actions/workflows/ci.yml/badge.svg)
 
 </p>
 
