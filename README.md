@@ -61,6 +61,7 @@ Telegram → Controller → Services → Clients → APIs externas
 - TMDB API
 - Groq (Whisper + LLM)
 - FFmpeg
+- JUnit 5
 
 ---
 
