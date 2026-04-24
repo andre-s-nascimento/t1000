@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'net.ddns.adambravo79'
-version = '0.0.1-SNAPSHOT'
+version = '1.0.0'
 
 java {
     toolchain { languageVersion = JavaLanguageVersion.of(21) }
@@ -27,11 +27,12 @@ dependencies {
     implementation 'org.telegram:telegrambots-springboot-longpolling-starter:9.5.0'
     implementation 'org.telegram:telegrambots-client:9.5.0'
     implementation 'net.bramp.ffmpeg:ffmpeg:0.8.0'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    testImplementation 'org.mockito:mockito-core:5.12.0'
-    testImplementation 'org.mockito:mockito-junit-jupiter:5.12.0'
-    testImplementation 'org.assertj:assertj-core:3.25.3'
+    testImplementation 'org.mockito:mockito-core'
+    testImplementation 'org.mockito:mockito-junit-jupiter'
+    testImplementation 'org.assertj:assertj-core'
 }
 
 configurations.all {
