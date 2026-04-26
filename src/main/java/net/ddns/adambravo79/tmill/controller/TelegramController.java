@@ -20,6 +20,7 @@ import net.ddns.adambravo79.tmill.client.BloggerClient;
 import net.ddns.adambravo79.tmill.model.MovieRecord;
 import net.ddns.adambravo79.tmill.service.*;
 import net.ddns.adambravo79.tmill.telegram.TelegramFacade;
+import net.ddns.adambravo79.tmill.telegram.TelegramSafeExecutor;
 
 @Slf4j
 @Component
@@ -32,6 +33,7 @@ public class TelegramController implements LongPollingUpdateConsumer {
   private final TranscricaoCache cache;
   private final TelegramFileService fileService;
   private final TelegramFacade telegramFacade;
+  private final TelegramSafeExecutor safeExecutor;
 
   @Value("${t1000.features.transcription-enabled:false}")
   private boolean transcriptionEnabled;
@@ -62,28 +64,26 @@ public class TelegramController implements LongPollingUpdateConsumer {
   // =========================
 
   private void processarUpdate(Update update) {
-    try {
-      if (update.hasCallbackQuery()) {
-        tratarCallback(update.getCallbackQuery());
-        return;
-      }
+    if (update.hasCallbackQuery()) {
+      long chatId = update.getCallbackQuery().getMessage().getChatId();
+      safeExecutor.run(
+          chatId, telegramFacade::enviarMensagem, () -> tratarCallback(update.getCallbackQuery()));
+      return;
+    }
 
-      if (!update.hasMessage()) return;
+    if (!update.hasMessage()) return;
 
-      Message message = update.getMessage();
-      long chatId = message.getChatId();
+    Message message = update.getMessage();
+    long chatId = message.getChatId();
 
-      if (message.hasVoice() || message.hasAudio()) {
-        tratarFluxoAudio(message, chatId);
-        return;
-      }
+    if (message.hasVoice() || message.hasAudio()) {
+      safeExecutor.run(
+          chatId, telegramFacade::enviarMensagem, () -> tratarFluxoAudio(message, chatId));
+      return;
+    }
 
-      if (message.hasText()) {
-        tratarTexto(message, chatId);
-      }
-
-    } catch (Exception e) {
-      log.error("Erro geral no processamento do update", e);
+    if (message.hasText()) {
+      safeExecutor.run(chatId, telegramFacade::enviarMensagem, () -> tratarTexto(message, chatId));
     }
   }
 
@@ -129,14 +129,9 @@ public class TelegramController implements LongPollingUpdateConsumer {
     String fileId =
         message.hasVoice() ? message.getVoice().getFileId() : message.getAudio().getFileId();
 
-    File file;
-    try {
-      file = fileService.baixarArquivo(fileId);
-    } catch (Exception e) {
-      log.error("Erro ao baixar áudio", e);
-      telegramFacade.enviarMensagem(chatId, "⚠️ Não consegui baixar o áudio.");
-      return;
-    }
+    // ✅ Agora sem try/catch: exceções do fileService são lançadas e capturadas pelo
+    // SafeExecutor
+    File file = fileService.baixarArquivo(fileId);
 
     long userId = message.getFrom().getId();
     boolean isOwner = userId == ownerId;
