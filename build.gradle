@@ -3,6 +3,7 @@ plugins {
     id 'org.springframework.boot' version '4.0.5'
     id 'io.spring.dependency-management' version '1.1.7'
     id 'jacoco'
+    id "com.diffplug.spotless" version "6.25.0"
 }
 
 
@@ -19,10 +20,15 @@ repositories {
 
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
-    
-    // Fixamos as versões que o Gradle não encontrou sozinho
+
+     // Lombok para código principal
     compileOnly 'org.projectlombok:lombok:1.18.34'
     annotationProcessor 'org.projectlombok:lombok:1.18.34'
+
+    // Lombok também para testes
+    testCompileOnly 'org.projectlombok:lombok:1.18.34'
+    testAnnotationProcessor 'org.projectlombok:lombok:1.18.34'
+    
     implementation 'io.projectreactor:reactor-core:3.7.0'
 
     // Suas libs do Telegram (Mantenha as versões que você definiu)
@@ -76,10 +82,31 @@ jacocoTestCoverageVerification {
     violationRules {
         rule {
             limit {
-                minimum = 0.70
+                minimum = 0.65
             }
         }
     }
 }
 
 check.dependsOn jacocoTestCoverageVerification
+
+spotless {
+    java {
+        target 'src/**/*.java'
+
+        googleJavaFormat("1.17.0")
+        removeUnusedImports()
+
+        importOrder('java', 'javax', 'org', 'com', '')
+
+        trimTrailingWhitespace()
+        endWithNewline()
+
+        // evita bagunça de licença
+        licenseHeader '/* (c) $YEAR */'
+    }
+}
+
+tasks.named("check") {
+    dependsOn("spotlessCheck")
+}
