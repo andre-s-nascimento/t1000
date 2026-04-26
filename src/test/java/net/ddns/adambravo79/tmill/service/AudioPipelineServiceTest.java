@@ -40,8 +40,8 @@ class AudioPipelineServiceTest {
 
     service.processarFluxoAudio(input, 1L, callback);
 
-    assertThat(chamadas).anyMatch(t -> t.contains("Bruto")).anyMatch(t -> t.contains("Refinado"));
-    assertThat(finais).contains(false, true);
+    assertThat(chamadas).contains("🎙️ *Bruto:* \n_Bruto_", "✨ *Refinado:* \nRefinado");
+    assertThat(finais).containsExactly(false, true);
 
     verify(cache).salvar(1L, "Refinado");
     verify(wav).delete();
@@ -72,10 +72,11 @@ class AudioPipelineServiceTest {
 
     service.processarFluxoAudio(input, 1L, callback);
 
-    assertThat(chamadas).anyMatch(t -> t.contains("Falha"));
+    assertThat(chamadas).contains("⚠️ Falha no processamento do áudio.");
     assertThat(finais).contains(false);
 
     verify(input).delete();
+    verifyNoInteractions(cache);
   }
 
   @Test
@@ -103,10 +104,12 @@ class AudioPipelineServiceTest {
 
     service.processarFluxoAudio(input, 1L, callback);
 
-    assertThat(chamadas).anyMatch(t -> t.contains("Falha"));
+    assertThat(chamadas).contains("⚠️ Falha no processamento do áudio.");
     assertThat(finais).contains(false);
 
+    // Apenas o arquivo de entrada é deletado
     verify(input).delete();
+    verifyNoInteractions(cache);
   }
 
   @Test
@@ -135,9 +138,10 @@ class AudioPipelineServiceTest {
 
     service.processarFluxoAudio(input, 1L, callback);
 
-    assertThat(chamadas).anyMatch(t -> t.contains("Falha"));
+    assertThat(chamadas).contains("🎙️ *Bruto:* \n_Bruto_", "⚠️ Falha no processamento do áudio.");
     assertThat(finais).contains(false);
 
     verify(input).delete();
+    verifyNoInteractions(cache);
   }
 }

@@ -241,4 +241,175 @@ class TelegramControllerTest {
 
     verifyNoInteractions(movieService, audioService);
   }
+
+  @Test
+  void deveProcessarCallbackPublicar() {
+    var cb = mock(CallbackQuery.class);
+    var message = mock(Message.class);
+    when(cb.getData()).thenReturn("blogger:publicar");
+    when(cb.getMessage()).thenReturn(message);
+    when(message.getChatId()).thenReturn(1L);
+
+    when(cache.recuperar(1L)).thenReturn("texto");
+    when(bloggerClient.criarRascunho(any(), any())).thenReturn("url");
+
+    var update = mock(Update.class);
+    when(update.hasCallbackQuery()).thenReturn(true);
+    when(update.getCallbackQuery()).thenReturn(cb);
+
+    controller.consume(update);
+
+    verify(bloggerClient).criarRascunho("Post automático", "texto");
+    verify(telegramFacade).enviarMensagem(1L, "✅ Publicado: url");
+  }
+
+  @Test
+  void deveProcessarCallbackId() {
+    var cb = mock(CallbackQuery.class);
+    var message = mock(Message.class);
+    when(cb.getData()).thenReturn("id:123");
+    when(cb.getMessage()).thenReturn(message);
+    when(message.getChatId()).thenReturn(1L);
+
+    var update = mock(Update.class);
+    when(update.hasCallbackQuery()).thenReturn(true);
+    when(update.getCallbackQuery()).thenReturn(cb);
+
+    when(movieService.buscarPorId(123L)).thenReturn(new MovieOrchestrationResponse("texto", "url"));
+
+    controller.consume(update);
+
+    verify(movieService).buscarPorId(123L);
+    verify(telegramFacade).enviarFoto(eq(1L), anyString(), anyString());
+  }
+
+  @Test
+  void deveProcessarCallbackCancelar() {
+    var cb = mock(CallbackQuery.class);
+    var message = mock(Message.class);
+    when(cb.getData()).thenReturn("blogger:cancelar");
+    when(cb.getMessage()).thenReturn(message);
+    when(message.getChatId()).thenReturn(1L);
+
+    var update = mock(Update.class);
+    when(update.hasCallbackQuery()).thenReturn(true);
+    when(update.getCallbackQuery()).thenReturn(cb);
+
+    controller.consume(update);
+
+    verify(cache).remover(1L);
+    verify(telegramFacade).enviarMensagem(1L, "❌ Publicação cancelada.");
+  }
+
+  @Test
+  void deveProcessarCallbackPublicarComTexto() {
+    var cb = mock(CallbackQuery.class);
+    var message = mock(Message.class);
+    when(cb.getData()).thenReturn("blogger:publicar");
+    when(cb.getMessage()).thenReturn(message);
+    when(message.getChatId()).thenReturn(1L);
+
+    var update = mock(Update.class);
+    when(update.hasCallbackQuery()).thenReturn(true);
+    when(update.getCallbackQuery()).thenReturn(cb);
+
+    when(cache.recuperar(1L)).thenReturn("texto");
+    when(bloggerClient.criarRascunho(any(), eq("texto"))).thenReturn("url");
+
+    controller.consume(update);
+
+    verify(bloggerClient).criarRascunho("Post automático", "texto");
+    verify(telegramFacade).enviarMensagem(1L, "✅ Publicado: url");
+    verify(cache).remover(1L);
+  }
+
+  @Test
+  void deveProcessarCallbackPublicarSemTexto() {
+    var cb = mock(CallbackQuery.class);
+    var message = mock(Message.class);
+    when(cb.getData()).thenReturn("blogger:publicar");
+    when(cb.getMessage()).thenReturn(message);
+    when(message.getChatId()).thenReturn(1L);
+
+    var update = mock(Update.class);
+    when(update.hasCallbackQuery()).thenReturn(true);
+    when(update.getCallbackQuery()).thenReturn(cb);
+
+    when(cache.recuperar(1L)).thenReturn(null);
+
+    controller.consume(update);
+
+    verify(telegramFacade).enviarMensagem(1L, "⚠️ Nenhuma transcrição disponível.");
+  }
+
+  @Test
+  void deveConsumirListaDeUpdates() {
+    var update = mock(Update.class);
+    when(update.hasMessage()).thenReturn(false);
+
+    controller.consume(List.of(update));
+
+    // apenas garante que não lança exceção
+    verifyNoInteractions(movieService, audioService);
+  }
+
+  @Test
+  void deveIgnorarListaVaziaOuNula() {
+    // lista vazia
+    controller.consume(List.of());
+    // lista nula
+    controller.consume((List<Update>) null);
+
+    // garante que não houve interação com os serviços
+    verifyNoInteractions(
+        movieService, audioService, bloggerClient, cache, fileService, telegramFacade);
+  }
+
+  @Test
+  void deveInformarQuandoFilmeNaoEncontrado() {
+    when(movieService.buscarFilme("inexistente"))
+        .thenReturn(new MovieSearchResponse(1, 0, 0, List.of()));
+
+    var update = mock(Update.class);
+    var message = mock(Message.class);
+    when(update.hasMessage()).thenReturn(true);
+    when(update.getMessage()).thenReturn(message);
+    when(message.getChatId()).thenReturn(1L);
+    when(message.hasText()).thenReturn(true);
+    when(message.getText()).thenReturn("t1000 buscar inexistente");
+
+    controller.consume(update);
+
+    verify(telegramFacade).enviarMensagem(1L, "❌ Filme não encontrado.");
+  }
+
+  @Test
+  void deveAvisarQuandoTranscricaoDesativada() {
+    var update = mock(Update.class);
+    var message = mock(Message.class);
+    when(update.hasMessage()).thenReturn(true);
+    when(update.getMessage()).thenReturn(message);
+    when(message.hasVoice()).thenReturn(true);
+    when(message.getChatId()).thenReturn(1L);
+
+    ReflectionTestUtils.setField(controller, "transcriptionEnabled", false);
+
+    controller.consume(update);
+
+    verify(telegramFacade).enviarMensagem(1L, "🔇 Transcrição desativada.");
+  }
+
+  @Test
+  void deveFecharMarkdownQuandoAsteriscosImpares() {
+    String texto = "*texto* com *asterisco";
+    String fechado = (String) ReflectionTestUtils.invokeMethod(controller, "fecharMarkdown", texto);
+    assertThat(fechado).endsWith("*");
+  }
+
+  @Test
+  void deveEnviarRespostaComBotoesBlogger() {
+    ReflectionTestUtils.invokeMethod(controller, "enviarRespostaComBotoesBlogger", 1L, "texto");
+    verify(cache).salvar(1L, "texto");
+    verify(telegramFacade).enviarComBotoes(eq(1L), eq("texto"), any());
+  }
 }
