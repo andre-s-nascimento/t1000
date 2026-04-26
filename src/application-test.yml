@@ -1,0 +1,15 @@
+tmdb:
+  token: fake
+  api:
+    url: http://localhost
+
+groq:
+  api:
+    key: fake
+
+bot:
+  token: fake
+
+telegram:
+  bot:
+    enabled: false # Desativa o polling no ambiente de teste  

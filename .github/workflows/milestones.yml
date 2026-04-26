@@ -1,0 +1,44 @@
+name: Sync Milestones
+
+on:
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  milestones:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create milestones
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const milestones = [
+              {
+                title: "v1.1.0 — Stability & Hardening",
+                description: "Melhorar robustez e evitar falhas em produção"
+              },
+              {
+                title: "v1.2.0 — Performance & Testing",
+                description: "Melhorar performance e confiabilidade"
+              }
+            ];
+
+            for (const m of milestones) {
+              const existing = await github.rest.issues.listMilestones({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+              });
+
+              const exists = existing.data.find(x => x.title === m.title);
+
+              if (!exists) {
+                await github.rest.issues.createMilestone({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title: m.title,
+                  description: m.description
+                });
+              }
+            }

@@ -1,240 +1,290 @@
+/* (c) 2026 */
 package net.ddns.adambravo79.tmill.controller;
 
-import lombok.extern.log4j.Log4j2;
-import net.ddns.adambravo79.tmill.model.MovieRecord;
-import net.ddns.adambravo79.tmill.service.MovieService;
-import net.ddns.adambravo79.tmill.service.AudioPipelineService;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
-import org.telegram.telegrambots.client.okhttp.OkHttpTelegramClient;
-import org.telegram.telegrambots.longpolling.util.LongPollingSingleThreadUpdateConsumer;
-import org.telegram.telegrambots.meta.api.methods.GetFile;
-import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
-import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
-import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
-import org.telegram.telegrambots.meta.api.objects.InputFile;
-import org.telegram.telegrambots.meta.api.objects.Update;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow;
-import org.telegram.telegrambots.meta.generics.TelegramClient;
-
 import java.io.File;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
-@Log4j2
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+import org.telegram.telegrambots.longpolling.interfaces.LongPollingUpdateConsumer;
+import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
+import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.api.objects.message.Message;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.*;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import net.ddns.adambravo79.tmill.client.BloggerClient;
+import net.ddns.adambravo79.tmill.model.MovieRecord;
+import net.ddns.adambravo79.tmill.service.*;
+import net.ddns.adambravo79.tmill.telegram.TelegramFacade;
+
+@Slf4j
 @Component
-public class TelegramController implements LongPollingSingleThreadUpdateConsumer {
+@RequiredArgsConstructor
+public class TelegramController implements LongPollingUpdateConsumer {
 
-    private final TelegramClient telegramClient;
-    private final MovieService movieService;
-    private final AudioPipelineService orchestrationService;
+  private final MovieService movieService;
+  private final AudioPipelineService audioService;
+  private final BloggerClient bloggerClient;
+  private final TranscricaoCache cache;
+  private final TelegramFileService fileService;
+  private final TelegramFacade telegramFacade;
 
-    @Value("${t1000.features.transcription-enabled:false}")
-    private boolean transcriptionEnabled;
+  @Value("${t1000.features.transcription-enabled:false}")
+  private boolean transcriptionEnabled;
 
-    public TelegramController(@Value("${bot.token}") String botToken,
-            MovieService movieService,
-            AudioPipelineService orchestrationService) {
-        this.telegramClient = new OkHttpTelegramClient(botToken);
-        this.movieService = movieService;
-        this.orchestrationService = orchestrationService;
+  @Value("${telegram.owner.id:0}")
+  private long ownerId;
+
+  private static final int TELEGRAM_LIMIT = 4000;
+
+  // =========================
+  // 🚀 ENTRYPOINT
+  // =========================
+
+  @Override
+  public void consume(List<Update> updates) {
+    if (updates == null || updates.isEmpty()) return;
+    updates.parallelStream().forEach(this::processarUpdate);
+  }
+
+  public void consume(Update update) {
+    if (update != null) {
+      processarUpdate(update);
+    }
+  }
+
+  // =========================
+  // 🧠 CORE ROUTER
+  // =========================
+
+  private void processarUpdate(Update update) {
+    try {
+      if (update.hasCallbackQuery()) {
+        tratarCallback(update.getCallbackQuery());
+        return;
+      }
+
+      if (!update.hasMessage()) return;
+
+      Message message = update.getMessage();
+      long chatId = message.getChatId();
+
+      if (message.hasVoice() || message.hasAudio()) {
+        tratarFluxoAudio(message, chatId);
+        return;
+      }
+
+      if (message.hasText()) {
+        tratarTexto(message, chatId);
+      }
+
+    } catch (Exception e) {
+      log.error("Erro geral no processamento do update", e);
+    }
+  }
+
+  // =========================
+  // 🎬 TEXTO
+  // =========================
+
+  private void tratarTexto(Message message, long chatId) {
+    String texto = message.getText().toLowerCase();
+
+    if (!texto.startsWith("t1000 buscar")) return;
+
+    String nome = texto.replace("t1000 buscar", "").trim();
+
+    var busca = movieService.buscarFilme(nome);
+
+    if (busca == null || busca.results() == null || busca.results().isEmpty()) {
+      telegramFacade.enviarMensagem(chatId, "❌ Filme não encontrado.");
+      return;
     }
 
-    /**
-     * PONTO DE ENTRADA: O Telegram chama este método para cada nova interação.
-     */
-    @Override
-    public void consume(Update update) {
-        // Se o usuário CLICOU em um botão, o Update contém um CallbackQuery.
-        if (update.hasCallbackQuery()) {
-            processarCliqueBotao(update.getCallbackQuery());
+    if (busca.results().size() == 1) {
+      var id = busca.results().get(0).id();
+      var resposta = movieService.buscarPorId(id);
+
+      telegramFacade.enviarFoto(chatId, resposta.urlFoto(), resposta.textoFormatado());
+      return;
+    }
+
+    enviarOpcoesDesambiguacao(chatId, busca.results());
+  }
+
+  // =========================
+  // 🎙️ AUDIO
+  // =========================
+
+  private void tratarFluxoAudio(Message message, long chatId) {
+    if (!transcriptionEnabled) {
+      telegramFacade.enviarMensagem(chatId, "🔇 Transcrição desativada.");
+      return;
+    }
+
+    String fileId =
+        message.hasVoice() ? message.getVoice().getFileId() : message.getAudio().getFileId();
+
+    File file;
+    try {
+      file = fileService.baixarArquivo(fileId);
+    } catch (Exception e) {
+      log.error("Erro ao baixar áudio", e);
+      telegramFacade.enviarMensagem(chatId, "⚠️ Não consegui baixar o áudio.");
+      return;
+    }
+
+    long userId = message.getFrom().getId();
+    boolean isOwner = userId == ownerId;
+
+    audioService.processarFluxoAudio(
+        file,
+        chatId,
+        (texto, isUltima) -> {
+          if (texto.length() > TELEGRAM_LIMIT) {
+            dividirMensagem(texto, TELEGRAM_LIMIT).stream()
+                .map(this::fecharMarkdown)
+                .forEach(parte -> telegramFacade.enviarMensagem(chatId, parte));
             return;
-        }
+          }
 
-        // Se o usuário ENVIOU uma mensagem (texto ou áudio).
-        if (update.hasMessage()) {
-            processarUpdate(update);
-        }
+          if (Boolean.TRUE.equals(isUltima) && isOwner) {
+            enviarRespostaComBotoesBlogger(chatId, texto);
+          } else {
+            telegramFacade.enviarMensagem(chatId, texto);
+          }
+        });
+  }
+
+  // =========================
+  // 🔘 CALLBACK
+  // =========================
+
+  private void tratarCallback(CallbackQuery cb) {
+    String data = cb.getData();
+    long chatId = cb.getMessage().getChatId();
+
+    if (data.startsWith("id:")) {
+      long id = Long.parseLong(data.replace("id:", ""));
+      var resposta = movieService.buscarPorId(id);
+
+      telegramFacade.enviarFoto(chatId, resposta.urlFoto(), resposta.textoFormatado());
+      return;
     }
 
-    private void processarUpdate(Update update) {
-        var message = update.getMessage();
-        long chatId = message.getChatId();
-
-        // 1. Processamento de Voz
-        if (message.hasVoice() || message.hasAudio()) {
-            tratarFluxoAudio(message, chatId);
-            return;
-        }
-
-        // 2. Comando de Busca: "t1000 buscar [nome]"
-        if (message.hasText() && message.getText().toLowerCase().startsWith("t1000 buscar ")) {
-            String busca = message.getText().substring(13).trim();
-            log.info("Iniciando busca para: {}", busca);
-
-            var buscaBruta = movieService.buscarFilme(busca);
-
-            if (buscaBruta == null || buscaBruta.results().isEmpty()) {
-                enviarResposta(chatId, "❌ Não encontrei nada com esse nome.");
-                return;
-            }
-
-            // Se o TMDB retornou mais de 1 resultado, chamamos a desambiguação.
-            if (buscaBruta.results().size() > 1) {
-                // Ordenamos a lista antes de enviar para a desambiguação
-                var resultadosOrdenados = buscaBruta.results().stream()
-                        .sorted((f1, f2) -> {// Primeiro critério: Ano (Crescente como você pediu)
-                            String data1 = f1.releaseDate() != null ? f1.releaseDate() : "0000";
-                            String data2 = f2.releaseDate() != null ? f2.releaseDate() : "0000";
-                            int compData = data1.compareTo(data2);
-
-                            if (compData != 0)
-                                return compData;
-
-                            // Segundo critério (Desempate): Popularidade (Quem é mais famoso ganha)
-                            return Double.compare(f2.popularity(), f1.popularity());
-                        })
-                        .toList();
-
-                enviarOpcoesDesambiguacao(chatId, resultadosOrdenados);
-            } else {
-                // Se só tem 1, traz os detalhes e a foto direto.
-                var resposta = movieService.buscarPorId(buscaBruta.results().get(0).id());
-                enviarFotoComLegenda(chatId, resposta.urlFoto(), resposta.textoFormatado());
-            }
-        }
+    if ("blogger:cancelar".equals(data)) {
+      cache.remover(chatId);
+      telegramFacade.enviarMensagem(chatId, "❌ Publicação cancelada.");
+      return;
     }
 
-    private void enviarOpcoesDesambiguacao(long chatId, List<MovieRecord> resultados) {
-        List<InlineKeyboardRow> rows = new ArrayList<>();
-        InlineKeyboardRow currentRow = new InlineKeyboardRow();
+    if ("blogger:publicar".equals(data)) {
+      String texto = cache.recuperar(chatId);
 
-        // Limitamos aos 10 primeiros JÁ ORDENADOS
-        var listaLimitada = resultados.stream().limit(10).toList();
+      if (texto == null) {
+        telegramFacade.enviarMensagem(chatId, "⚠️ Nenhuma transcrição disponível.");
+        return;
+      }
 
-        for (int i = 0; i < listaLimitada.size(); i++) {
-            MovieRecord filme = listaLimitada.get(i);
+      String url = bloggerClient.criarRascunho("Post automático", texto);
 
-            // Trata o ano para exibição no botão
-            String ano = (filme.releaseDate() != null && filme.releaseDate().length() >= 4)
-                    ? " (" + filme.releaseDate().substring(0, 4) + ")"
-                    : " (S/A)";
+      if (url != null) {
+        telegramFacade.enviarMensagem(chatId, "✅ Publicado: " + url);
+        cache.remover(chatId);
+      } else {
+        telegramFacade.enviarMensagem(chatId, "❌ Falha ao publicar.");
+      }
+    }
+  }
 
-            InlineKeyboardButton botao = InlineKeyboardButton.builder()
-                    .text(filme.title() + ano)
-                    .callbackData("id:" + filme.id())
-                    .build();
+  // =========================
+  // 🧩 UI HELPERS
+  // =========================
 
-            currentRow.add(botao);
+  private void enviarOpcoesDesambiguacao(long chatId, List<MovieRecord> resultados) {
+    List<InlineKeyboardRow> rows = new ArrayList<>();
+    InlineKeyboardRow current = new InlineKeyboardRow();
 
-            if ((i + 1) % 2 == 0 || (i + 1) == listaLimitada.size()) {
-                rows.add(currentRow);
-                currentRow = new InlineKeyboardRow();
-            }
-        }
+    var lista = resultados.stream().limit(10).toList();
 
-        SendMessage sm = SendMessage.builder()
-                .chatId(String.valueOf(chatId))
-                .text("🧐 Encontrei vários resultados (ordenados por ano). Qual deles você quer?")
-                .replyMarkup(InlineKeyboardMarkup.builder().keyboard(rows).build())
-                .build();
+    for (int i = 0; i < lista.size(); i++) {
+      var filme = lista.get(i);
 
-        try {
-            telegramClient.execute(sm);
-        } catch (Exception e) {
-            log.error("Erro ao renderizar teclado ordenado", e);
-        }
+      String ano =
+          (filme.releaseDate() != null && filme.releaseDate().length() >= 4)
+              ? " (" + filme.releaseDate().substring(0, 4) + ")"
+              : " (S/A)";
+
+      current.add(
+          InlineKeyboardButton.builder()
+              .text(filme.title() + ano)
+              .callbackData("id:" + filme.id())
+              .build());
+
+      if ((i + 1) % 2 == 0 || (i + 1) == lista.size()) {
+        rows.add(current);
+        current = new InlineKeyboardRow();
+      }
     }
 
-    /**
-     * LÓGICA DE REAÇÃO: Processa o ID que veio no clique do botão.
-     */
-    private void processarCliqueBotao(CallbackQuery cb) {
-        String data = cb.getData();
-        long chatId = cb.getMessage().getChatId();
+    var markup = InlineKeyboardMarkup.builder().keyboard(rows).build();
 
-        // Se o dado começar com "id:", sabemos que é um ID do TMDB.
-        if (data.startsWith("id:")) {
-            long idFilme = Long.parseLong(data.replace("id:", ""));
-            log.info("Botão clicado! Buscando detalhes do ID: {}", idFilme);
+    telegramFacade.enviarComBotoes(
+        chatId, "🧐 Encontrei vários resultados. Qual você quer?", markup);
+  }
 
-            // Agora buscamos os detalhes exatos pelo ID, garantindo a foto correta.
-            var resposta = movieService.buscarPorId(idFilme);
-            enviarFotoComLegenda(chatId, resposta.urlFoto(), resposta.textoFormatado());
-        }
+  private void enviarRespostaComBotoesBlogger(long chatId, String texto) {
+    cache.salvar(chatId, texto);
+
+    InlineKeyboardMarkup markup =
+        InlineKeyboardMarkup.builder()
+            .keyboard(
+                List.of(
+                    new InlineKeyboardRow(
+                        InlineKeyboardButton.builder()
+                            .text("📝 Publicar")
+                            .callbackData("blogger:publicar")
+                            .build(),
+                        InlineKeyboardButton.builder()
+                            .text("❌ Cancelar")
+                            .callbackData("blogger:cancelar")
+                            .build())))
+            .build();
+
+    telegramFacade.enviarComBotoes(chatId, texto, markup);
+  }
+
+  // =========================
+  // ✂️ UTIL
+  // =========================
+
+  private List<String> dividirMensagem(String texto, int limite) {
+    List<String> partes = new ArrayList<>();
+
+    while (texto.length() > limite) {
+      int corte = texto.lastIndexOf(" ", limite);
+      if (corte <= 0) corte = limite;
+
+      partes.add(texto.substring(0, corte));
+      texto = texto.substring(corte).trim();
     }
 
-    // --- MÉTODOS AUXILIARES (Áudio, Envio de Foto, etc) ---
-
-    private void tratarFluxoAudio(org.telegram.telegrambots.meta.api.objects.message.Message message, long chatId) {
-        if (!transcriptionEnabled) {
-            enviarResposta(chatId, "🔇 Transcrição desativada.");
-            return;
-        }
-        String fileId = message.hasVoice() ? message.getVoice().getFileId() : message.getAudio().getFileId();
-
-        Optional<File> fileOpt = baixarArquivoTelegram(fileId);
-
-        if (fileOpt.isEmpty()) {
-            enviarResposta(chatId, "⚠️ Não consegui baixar o áudio.");
-            return;
-        }
-
-        File file = fileOpt.get();
-
-        if (file != null) {
-            orchestrationService.processarFluxoAudio(file, texto -> enviarResposta(chatId, texto));
-        }
+    if (!texto.isEmpty()) {
+      partes.add(texto);
     }
 
-    private Optional<File> baixarArquivoTelegram(String fileId) {
-        try {
-            var telegramFile = telegramClient.execute(new GetFile(fileId));
-            File localTemp = telegramClient.downloadFile(telegramFile);
+    return partes;
+  }
 
-            File finalFile = new File("temp_audio/" + localTemp.getName() + ".oga");
-            Files.createDirectories(finalFile.getParentFile().toPath());
-            Files.move(localTemp.toPath(), finalFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-
-            return Optional.of(finalFile);
-
-        } catch (Exception e) {
-            log.error("Erro ao baixar arquivo do Telegram", e);
-            return Optional.empty();
-        }
+  private String fecharMarkdown(String texto) {
+    long count = texto.chars().filter(c -> c == '*').count();
+    if (count % 2 != 0) {
+      return texto + "*";
     }
-
-    private void enviarResposta(long chatId, String texto) {
-        try {
-            telegramClient.execute(SendMessage.builder()
-                    .chatId(String.valueOf(chatId))
-                    .text(texto)
-                    .parseMode("Markdown")
-                    .build());
-        } catch (Exception e) {
-            try {
-                telegramClient.execute(new SendMessage(String.valueOf(chatId), texto));
-            } catch (Exception ex) {
-            }
-        }
-    }
-
-    private void enviarFotoComLegenda(long chatId, String urlFoto, String legenda) {
-        try {
-            telegramClient.execute(SendPhoto.builder()
-                    .chatId(String.valueOf(chatId))
-                    .photo(new InputFile(urlFoto))
-                    .caption(legenda)
-                    .parseMode("Markdown")
-                    .build());
-        } catch (Exception e) {
-            log.warn("Erro ao enviar foto, enviando apenas texto.");
-            enviarResposta(chatId, legenda);
-        }
-    }
+    return texto;
+  }
 }

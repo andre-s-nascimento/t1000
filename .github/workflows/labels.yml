@@ -3,11 +3,17 @@ name: Sync Labels
 on:
   push:
     paths:
-      - ".github/labels.yml"
+      - '.github/labels.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write   # 👈 ESSA LINHA RESOLVE
 
 jobs:
   labels:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v3
 
