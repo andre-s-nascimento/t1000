@@ -1,4 +1,4 @@
-/* (c) 2026 */
+/* (c) 2026-2026 */
 package net.ddns.adambravo79.tmill.service;
 
 import java.util.Optional;
@@ -12,6 +12,12 @@ import net.ddns.adambravo79.tmill.exception.MovieNotFoundException;
 import net.ddns.adambravo79.tmill.model.MovieOrchestrationResponse;
 import net.ddns.adambravo79.tmill.model.MovieSearchResponse;
 
+/**
+ * Serviço responsável por buscar e formatar informações de filmes via API do TMDB.
+ *
+ * <p>Principais responsabilidades: - Pesquisar filmes por nome. - Buscar detalhes completos por ID.
+ * - Montar resposta formatada com título, ano, nota, elenco, sinopse e provedores de streaming.
+ */
 @Slf4j
 @Service
 public class MovieService {
@@ -22,7 +28,13 @@ public class MovieService {
         this.tmdbClient = tmdbClient;
     }
 
-    /** Agora retorna o objeto de busca unificado. */
+    /**
+     * Realiza a busca de filmes por nome.
+     *
+     * @param nome título do filme.
+     * @return {@link MovieSearchResponse} com os resultados encontrados.
+     * @throws MovieNotFoundException se nenhum resultado for encontrado.
+     */
     public MovieSearchResponse buscarFilme(String nome) {
         var busca = tmdbClient.pesquisarFilme(nome);
         if (busca == null || busca.results() == null || busca.results().isEmpty()) {
@@ -31,15 +43,25 @@ public class MovieService {
         return busca;
     }
 
-    /** Executa a busca formatada aplicando a lógica de desambiguação automática. */
+    /**
+     * Executa a busca formatada aplicando lógica de desambiguação automática.
+     *
+     * @param nome título do filme.
+     * @return {@link MovieOrchestrationResponse} com texto formatado e URL do poster.
+     */
     public MovieOrchestrationResponse executarBuscaFormatada(String nome) {
-        var busca = buscarFilme(nome); // ✅ já lança exceção se não encontrar
-
+        var busca = buscarFilme(nome);
         var basico = busca.results().get(0);
         return buscarPorId(basico.id());
     }
 
-    /** Busca detalhes diretamente pelo ID do TMDB. */
+    /**
+     * Busca detalhes completos de um filme diretamente pelo ID no TMDB.
+     *
+     * @param id identificador único do filme no TMDB.
+     * @return {@link MovieOrchestrationResponse} com texto formatado e URL do poster.
+     * @throws MovieNotFoundException se os detalhes não forem encontrados.
+     */
     public MovieOrchestrationResponse buscarPorId(long id) {
         var detalhes = tmdbClient.buscarDetalhes(id);
         if (detalhes == null) {
@@ -97,6 +119,7 @@ public class MovieService {
         return new MovieOrchestrationResponse(texto, urlPoster);
     }
 
+    /** Converte código de país ISO em emoji de bandeira. */
     private Optional<String> getFlagEmoji(String countryCode) {
         if (countryCode == null || countryCode.length() != 2) return Optional.empty();
         int firstLetter = Character.codePointAt(countryCode.toUpperCase(), 0) - 0x41 + 0x1F1E6;
@@ -106,6 +129,7 @@ public class MovieService {
                         + new String(Character.toChars(secondLetter)));
     }
 
+    /** Escapa caracteres especiais para evitar conflitos com Markdown. */
     private String escapeMarkdown(String texto) {
         return texto.replace("_", "\\_")
                 .replace("*", "\\*")

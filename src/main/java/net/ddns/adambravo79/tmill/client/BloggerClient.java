@@ -1,4 +1,4 @@
-/* (c) 2026 */
+/* (c) 2026-2026 */
 package net.ddns.adambravo79.tmill.client;
 
 import java.util.Map;
@@ -51,6 +51,8 @@ public class BloggerClient {
     }
 
     private String obterAccessToken() {
+        log.info("🔑 Solicitando access token para Blogger blogId={}", blogId);
+
         String formBody =
                 "client_id="
                         + clientId
@@ -70,14 +72,18 @@ public class BloggerClient {
                         .body(new ParameterizedTypeReference<Map<String, Object>>() {});
 
         if (response == null || !response.containsKey("access_token")) {
+            log.error("❌ Falha ao obter access token para Blogger blogId={}", blogId);
             throw new BloggerPublishException("Falha ao obter access token para Blogger");
         }
+
+        log.info("✅ Access token obtido com sucesso para blogId={}", blogId);
         return (String) response.get("access_token");
     }
 
     public String criarRascunho(String titulo, String conteudo) {
-        String accessToken = obterAccessToken();
+        log.info("📝 Criando rascunho no Blogger blogId={} title={}", blogId, titulo);
 
+        String accessToken = obterAccessToken();
         String conteudoHtml = "<p>" + conteudo.replace("\n", "</p><p>") + "</p>";
 
         var payload = Map.of("title", titulo, "content", conteudoHtml, "status", "DRAFT");
@@ -94,13 +100,17 @@ public class BloggerClient {
                             .retrieve()
                             .body(new ParameterizedTypeReference<Map<String, Object>>() {});
         } catch (Exception e) {
+            log.error("❌ Erro ao criar rascunho no Blogger blogId={} title={}", blogId, titulo, e);
             throw new BloggerPublishException("Erro ao criar rascunho no Blogger", e);
         }
 
         if (response == null || !response.containsKey("url")) {
+            log.error("❌ Rascunho criado sem URL de retorno blogId={} title={}", blogId, titulo);
             throw new BloggerPublishException("Rascunho criado sem URL de retorno");
         }
 
-        return (String) response.get("url");
+        String url = (String) response.get("url");
+        log.info("✅ Rascunho criado com sucesso blogId={} title={} url={}", blogId, titulo, url);
+        return url;
     }
 }

@@ -1,4 +1,4 @@
-/* (c) 2026 */
+/* (c) 2026-2026 */
 package net.ddns.adambravo79.tmill.client;
 
 import java.util.List;
@@ -55,10 +55,10 @@ public class TmdbClient {
         String queryFinal = ATALHOS.getOrDefault(queryNormalizada, query);
 
         if (!queryFinal.equals(query)) {
-            log.info("TMDB: Atalho de Mestre aplicado! '{}' -> '{}'", query, queryFinal);
+            log.info("🎬 TMDB: Atalho aplicado '{}' -> '{}'", query, queryFinal);
         }
 
-        log.info("TMDB: Pesquisando -> {}", queryFinal);
+        log.info("🔎 TMDB: Pesquisando filme query='{}'", queryFinal);
 
         MovieSearchResponse response =
                 restClient
@@ -76,16 +76,20 @@ public class TmdbClient {
                         .body(MovieSearchResponse.class);
 
         if (response == null || response.results().isEmpty()) {
-            log.error("TMDB: resposta inválida na busca por '{}'", queryFinal);
+            log.error("❌ TMDB: resposta inválida na busca query='{}'", queryFinal);
             throw new IllegalStateException("Falha na busca de filmes — resposta inválida");
         }
 
+        log.info(
+                "✅ TMDB: Busca concluída query='{}' resultados={}",
+                queryFinal,
+                response.results().size());
         return response;
     }
 
     /** Obtém detalhes técnicos de um filme específico pelo ID. [cite: 34] */
     public MovieRecord buscarDetalhes(Long movieId) {
-        log.debug("TMDB: Buscando detalhes do ID {}", movieId);
+        log.debug("TMDB: Buscando detalhes movieId={}", movieId);
 
         MovieRecord response =
                 restClient
@@ -100,16 +104,17 @@ public class TmdbClient {
                         .body(MovieRecord.class);
 
         if (response == null) {
-            log.error("TMDB: resposta inválida ao buscar detalhes do ID {}", movieId);
+            log.error("❌ TMDB: resposta inválida ao buscar detalhes movieId={}", movieId);
             throw new IllegalStateException("Falha ao buscar detalhes do filme");
         }
 
+        log.info("✅ TMDB: Detalhes obtidos movieId={} title={}", movieId, response.title());
         return response;
     }
 
     /** Busca a lista de elenco (Cast). [cite: 36] */
     public List<CastRecord> buscarElenco(Long movieId) {
-        log.debug("TMDB: Buscando elenco do ID {}", movieId);
+        log.debug("TMDB: Buscando elenco movieId={}", movieId);
 
         CreditsResponse response =
                 restClient
@@ -119,16 +124,17 @@ public class TmdbClient {
                         .body(CreditsResponse.class);
 
         if (response == null || response.cast() == null) {
-            log.error("TMDB: resposta inválida ao buscar elenco do ID {}", movieId);
+            log.error("❌ TMDB: resposta inválida ao buscar elenco movieId={}", movieId);
             throw new IllegalStateException("Falha ao buscar elenco");
         }
 
+        log.info("✅ TMDB: Elenco obtido movieId={} castSize={}", movieId, response.cast().size());
         return response.cast();
     }
 
     /** Identifica provedores de streaming (Flatrate) disponíveis no Brasil. [cite: 28] */
     public String buscarOndeAssistir(Long movieId) {
-        log.debug("TMDB: Verificando provedores para o ID {}", movieId);
+        log.debug("TMDB: Verificando provedores movieId={}", movieId);
 
         WatchProviderResponse response =
                 restClient
@@ -138,20 +144,27 @@ public class TmdbClient {
                         .body(WatchProviderResponse.class);
 
         if (response == null || response.results() == null) {
-            log.error("TMDB: resposta inválida ao buscar provedores do ID {}", movieId);
+            log.error("❌ TMDB: resposta inválida ao buscar provedores movieId={}", movieId);
             throw new IllegalStateException("Falha ao buscar provedores de streaming");
         }
 
         if (response.results().containsKey("BR")) {
             var brProviders = response.results().get("BR").flatrate();
             if (brProviders != null && !brProviders.isEmpty()) {
-                return brProviders.stream()
-                        .map(Provider::name)
-                        .reduce((a, b) -> a + ", " + b)
-                        .orElse("Não disponível em streaming.");
+                String providers =
+                        brProviders.stream()
+                                .map(Provider::name)
+                                .reduce((a, b) -> a + ", " + b)
+                                .orElse("");
+                log.info(
+                        "✅ TMDB: Provedores encontrados movieId={} providers={}",
+                        movieId,
+                        providers);
+                return providers;
             }
         }
 
+        log.warn("⚠️ TMDB: Nenhum provedor de streaming encontrado movieId={}", movieId);
         return "Disponível apenas para Aluguel/Compra. (ou em um caminhão caído)";
     }
 }

@@ -21,7 +21,11 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(AudioProcessingException.class)
     public ResponseEntity<ErrorResponse> handleAudio(AudioProcessingException ex) {
-        log.error("Erro no processamento de áudio", ex);
+        log.error(
+                "❌ Erro no processamento de áudio tipo={} msg={}",
+                ex.getClass().getSimpleName(),
+                ex.getMessage(),
+                ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(
                         new ErrorResponse(
@@ -30,28 +34,44 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(TelegramFileException.class)
     public ResponseEntity<ErrorResponse> handleTelegramFile(TelegramFileException ex) {
-        log.error("Erro ao manipular arquivo do Telegram", ex);
+        log.error(
+                "❌ Erro ao manipular arquivo do Telegram tipo={} msg={}",
+                ex.getClass().getSimpleName(),
+                ex.getMessage(),
+                ex);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ErrorResponse(ex.getMessage(), "TelegramFileException", Instant.now()));
     }
 
     @ExceptionHandler(MovieNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleMovieNotFound(MovieNotFoundException ex) {
-        log.warn("Filme não encontrado", ex);
+        log.warn(
+                "⚠️ Filme não encontrado tipo={} msg={}",
+                ex.getClass().getSimpleName(),
+                ex.getMessage(),
+                ex);
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new ErrorResponse(ex.getMessage(), "MovieNotFoundException", Instant.now()));
     }
 
     @ExceptionHandler(BloggerPublishException.class)
     public ResponseEntity<ErrorResponse> handleBlogger(BloggerPublishException ex) {
-        log.error("Erro ao publicar no Blogger", ex);
+        log.error(
+                "❌ Erro ao publicar no Blogger tipo={} msg={}",
+                ex.getClass().getSimpleName(),
+                ex.getMessage(),
+                ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new ErrorResponse(ex.getMessage(), "BloggerPublishException", Instant.now()));
     }
 
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<ErrorResponse> handleRuntime(RuntimeException ex) {
-        log.error("Erro inesperado", ex);
+        log.error(
+                "❌ Erro inesperado tipo={} msg={}",
+                ex.getClass().getSimpleName(),
+                ex.getMessage(),
+                ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new ErrorResponse(ex.getMessage(), "RuntimeException", Instant.now()));
     }

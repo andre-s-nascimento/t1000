@@ -1,6 +1,12 @@
-/* (c) 2026 */
+/* (c) 2026-2026 */
 package net.ddns.adambravo79.tmill.exception;
 
+/**
+ * Exceção lançada quando ocorre falha no processamento de áudio.
+ *
+ * <p>Permite incluir um contexto adicional (ex.: fileId, chatId) para enriquecer os logs e
+ * facilitar a depuração.
+ */
 public class AudioProcessingException extends RuntimeException {
 
     private final String contexto;
@@ -22,5 +28,10 @@ public class AudioProcessingException extends RuntimeException {
 
     public String getContexto() {
         return contexto;
+    }
+
+    @Override
+    public String toString() {
+        return "AudioProcessingException{message=" + getMessage() + ", contexto=" + contexto + "}";
     }
 }

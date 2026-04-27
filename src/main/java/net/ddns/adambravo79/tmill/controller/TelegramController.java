@@ -1,4 +1,4 @@
-/* (c) 2026 */
+/* (c) 2026-2026 */
 package net.ddns.adambravo79.tmill.controller;
 
 import java.io.File;
@@ -50,11 +50,13 @@ public class TelegramController implements LongPollingUpdateConsumer {
     @Override
     public void consume(List<Update> updates) {
         if (updates == null || updates.isEmpty()) return;
+        log.info("📩 Recebidos {} updates do Telegram", updates.size());
         updates.parallelStream().forEach(this::processarUpdate);
     }
 
     public void consume(Update update) {
         if (update != null) {
+            log.info("📩 Recebido update único do Telegram");
             processarUpdate(update);
         }
     }
@@ -66,6 +68,10 @@ public class TelegramController implements LongPollingUpdateConsumer {
     private void processarUpdate(Update update) {
         if (update.hasCallbackQuery()) {
             long chatId = update.getCallbackQuery().getMessage().getChatId();
+            log.info(
+                    "🔘 Callback recebido chatId={} data={}",
+                    chatId,
+                    update.getCallbackQuery().getData());
             safeExecutor.run(
                     chatId,
                     telegramFacade::enviarMensagem,
@@ -77,6 +83,15 @@ public class TelegramController implements LongPollingUpdateConsumer {
 
         Message message = update.getMessage();
         long chatId = message.getChatId();
+        long userId = message.getFrom().getId();
+
+        log.info(
+                "💬 Mensagem recebida chatId={} userId={} tipo={}",
+                chatId,
+                userId,
+                message.hasText()
+                        ? "texto"
+                        : message.hasVoice() ? "voz" : message.hasAudio() ? "áudio" : "outro");
 
         if (message.hasVoice() || message.hasAudio()) {
             safeExecutor.run(
@@ -98,14 +113,15 @@ public class TelegramController implements LongPollingUpdateConsumer {
 
     private void tratarTexto(Message message, long chatId) {
         String texto = message.getText().toLowerCase();
+        log.debug("🔎 Processando texto chatId={} texto='{}'", chatId, texto);
 
         if (!texto.startsWith("t1000 buscar")) return;
 
         String nome = texto.replace("t1000 buscar", "").trim();
-
         var busca = movieService.buscarFilme(nome);
 
         if (busca == null || busca.results() == null || busca.results().isEmpty()) {
+            log.warn("⚠️ Filme não encontrado chatId={} query='{}'", chatId, nome);
             telegramFacade.enviarMensagem(chatId, "❌ Filme não encontrado.");
             return;
         }
@@ -113,11 +129,15 @@ public class TelegramController implements LongPollingUpdateConsumer {
         if (busca.results().size() == 1) {
             var id = busca.results().get(0).id();
             var resposta = movieService.buscarPorId(id);
-
+            log.info("✅ Filme encontrado único chatId={} movieId={}", chatId, id);
             telegramFacade.enviarFoto(chatId, resposta.urlFoto(), resposta.textoFormatado());
             return;
         }
 
+        log.info(
+                "🧐 Vários resultados encontrados chatId={} total={}",
+                chatId,
+                busca.results().size());
         enviarOpcoesDesambiguacao(chatId, busca.results());
     }
 
@@ -127,6 +147,7 @@ public class TelegramController implements LongPollingUpdateConsumer {
 
     private void tratarFluxoAudio(Message message, long chatId) {
         if (!transcriptionEnabled) {
+            log.warn("⚠️ Transcrição desativada chatId={}", chatId);
             telegramFacade.enviarMensagem(chatId, "🔇 Transcrição desativada.");
             return;
         }
@@ -135,18 +156,26 @@ public class TelegramController implements LongPollingUpdateConsumer {
                 message.hasVoice()
                         ? message.getVoice().getFileId()
                         : message.getAudio().getFileId();
-
-        // ✅ Agora sem try/catch: exceções do fileService são lançadas e capturadas pelo
-        // SafeExecutor
-        File file = fileService.baixarArquivo(fileId);
-
         long userId = message.getFrom().getId();
         boolean isOwner = userId == ownerId;
+
+        log.info(
+                "🎙️ Iniciando fluxo de áudio chatId={} userId={} fileId={}",
+                chatId,
+                userId,
+                fileId);
+
+        File file = fileService.baixarArquivo(fileId);
 
         audioService.processarFluxoAudio(
                 file,
                 chatId,
                 (texto, isUltima) -> {
+                    log.debug(
+                            "📄 Texto transcrito chatId={} size={} ultima={}",
+                            chatId,
+                            texto.length(),
+                            isUltima);
                     if (texto.length() > TELEGRAM_LIMIT) {
                         dividirMensagem(texto, TELEGRAM_LIMIT).stream()
                                 .map(this::fecharMarkdown)
@@ -155,6 +184,7 @@ public class TelegramController implements LongPollingUpdateConsumer {
                     }
 
                     if (Boolean.TRUE.equals(isUltima) && isOwner) {
+                        log.info("📝 Enviando resposta com botões Blogger chatId={}", chatId);
                         enviarRespostaComBotoesBlogger(chatId, texto);
                     } else {
                         telegramFacade.enviarMensagem(chatId, texto);
@@ -169,17 +199,19 @@ public class TelegramController implements LongPollingUpdateConsumer {
     private void tratarCallback(CallbackQuery cb) {
         String data = cb.getData();
         long chatId = cb.getMessage().getChatId();
+        log.debug("🔘 Tratando callback chatId={} data={}", chatId, data);
 
         if (data.startsWith("id:")) {
             long id = Long.parseLong(data.replace("id:", ""));
             var resposta = movieService.buscarPorId(id);
-
+            log.info("✅ Callback de filme chatId={} movieId={}", chatId, id);
             telegramFacade.enviarFoto(chatId, resposta.urlFoto(), resposta.textoFormatado());
             return;
         }
 
         if ("blogger:cancelar".equals(data)) {
             cache.remover(chatId);
+            log.info("🛑 Publicação cancelada chatId={}", chatId);
             telegramFacade.enviarMensagem(chatId, "❌ Publicação cancelada.");
             return;
         }
@@ -188,6 +220,7 @@ public class TelegramController implements LongPollingUpdateConsumer {
             String texto = cache.recuperar(chatId);
 
             if (texto == null) {
+                log.warn("⚠️ Nenhuma transcrição disponível para publicar chatId={}", chatId);
                 telegramFacade.enviarMensagem(chatId, "⚠️ Nenhuma transcrição disponível.");
                 return;
             }
@@ -195,9 +228,11 @@ public class TelegramController implements LongPollingUpdateConsumer {
             String url = bloggerClient.criarRascunho("Post automático", texto);
 
             if (url != null) {
+                log.info("✅ Publicação realizada chatId={} url={}", chatId, url);
                 telegramFacade.enviarMensagem(chatId, "✅ Publicado: " + url);
                 cache.remover(chatId);
             } else {
+                log.error("❌ Falha ao publicar no Blogger chatId={}", chatId);
                 telegramFacade.enviarMensagem(chatId, "❌ Falha ao publicar.");
             }
         }
@@ -208,6 +243,11 @@ public class TelegramController implements LongPollingUpdateConsumer {
     // =========================
 
     private void enviarOpcoesDesambiguacao(long chatId, List<MovieRecord> resultados) {
+        log.debug(
+                "🧩 Enviando opções de desambiguação chatId={} total={}",
+                chatId,
+                resultados.size());
+
         List<InlineKeyboardRow> rows = new ArrayList<>();
         InlineKeyboardRow current = new InlineKeyboardRow();
 
@@ -235,12 +275,20 @@ public class TelegramController implements LongPollingUpdateConsumer {
 
         var markup = InlineKeyboardMarkup.builder().keyboard(rows).build();
 
+        log.info(
+                "🧩 Opções de desambiguação enviadas chatId={} totalOpcoes={}",
+                chatId,
+                lista.size());
         telegramFacade.enviarComBotoes(
                 chatId, "🧐 Encontrei vários resultados. Qual você quer?", markup);
     }
 
     private void enviarRespostaComBotoesBlogger(long chatId, String texto) {
         cache.salvar(chatId, texto);
+        log.info(
+                "📝 Cache salvo para publicação Blogger chatId={} textoSize={}",
+                chatId,
+                texto.length());
 
         InlineKeyboardMarkup markup =
                 InlineKeyboardMarkup.builder()
@@ -257,6 +305,7 @@ public class TelegramController implements LongPollingUpdateConsumer {
                                                         .build())))
                         .build();
 
+        log.info("📝 Botões de publicação enviados chatId={}", chatId);
         telegramFacade.enviarComBotoes(chatId, texto, markup);
     }
 
@@ -265,6 +314,8 @@ public class TelegramController implements LongPollingUpdateConsumer {
     // =========================
 
     private List<String> dividirMensagem(String texto, int limite) {
+        log.debug("✂️ Dividindo mensagem size={} limite={}", texto.length(), limite);
+
         List<String> partes = new ArrayList<>();
 
         while (texto.length() > limite) {
@@ -279,12 +330,14 @@ public class TelegramController implements LongPollingUpdateConsumer {
             partes.add(texto);
         }
 
+        log.debug("✂️ Mensagem dividida em {} partes", partes.size());
         return partes;
     }
 
     private String fecharMarkdown(String texto) {
         long count = texto.chars().filter(c -> c == '*').count();
         if (count % 2 != 0) {
+            log.debug("✏️ Ajustando markdown textoSize={} asteriscos={}", texto.length(), count);
             return texto + "*";
         }
         return texto;

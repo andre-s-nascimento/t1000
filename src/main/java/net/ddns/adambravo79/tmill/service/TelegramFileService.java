@@ -1,4 +1,4 @@
-/* (c) 2026 */
+/* (c) 2026-2026 */
 package net.ddns.adambravo79.tmill.service;
 
 import java.io.File;
@@ -12,6 +12,13 @@ import lombok.extern.slf4j.Slf4j;
 import net.ddns.adambravo79.tmill.exception.TelegramFileException;
 import net.ddns.adambravo79.tmill.telegram.TelegramFacade;
 
+/**
+ * Serviço responsável por baixar arquivos do Telegram a partir de um fileId.
+ *
+ * <p>Principais responsabilidades: - Consultar metadados do arquivo via {@link TelegramFacade}. -
+ * Realizar o download do arquivo para o sistema local. - Garantir que nunca retorne {@code null},
+ * lançando {@link TelegramFileException} em caso de falha.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -20,14 +27,16 @@ public class TelegramFileService {
     private final TelegramFacade telegramFacade;
 
     /**
-     * Baixa um arquivo do Telegram dado o fileId. Nunca retorna null — sempre lança exceção em caso
-     * de falha.
+     * Baixa um arquivo do Telegram dado o fileId.
+     *
+     * @param fileId identificador único do arquivo no Telegram.
+     * @return {@link File} baixado e armazenado localmente.
+     * @throws TelegramFileException em caso de falha no download ou se o arquivo não existir.
      */
     public File baixarArquivo(String fileId) {
         try {
             log.debug("Baixando arquivo do Telegram fileId={}", fileId);
 
-            // Usa o método utilitário do facade
             org.telegram.telegrambots.meta.api.objects.File tgFile =
                     telegramFacade.getFile(new GetFile(fileId));
 
