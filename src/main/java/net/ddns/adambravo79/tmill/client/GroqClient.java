@@ -20,83 +20,84 @@ import net.ddns.adambravo79.tmill.model.TranscriptionResponse;
 @Component
 public class GroqClient {
 
-  private final RestClient restClient;
+    private final RestClient restClient;
 
-  // ✅ Construtor principal usado pelo Spring
-  @Autowired
-  public GroqClient(@Value("${groq.api.key}") String apiKey) {
-    this.restClient =
-        RestClient.builder()
-            .baseUrl("https://api.groq.com")
-            .defaultHeader("Authorization", "Bearer " + apiKey)
-            .build();
-  }
-
-  // ✅ Construtor alternativo para testes (sem apiKey, apenas RestClient mockado)
-  public GroqClient(RestClient restClient) {
-    this.restClient = restClient;
-  }
-
-  public String transcrever(File wavFile) {
-    log.info("Iniciando transcrição via Groq (Whisper) para o arquivo: {}", wavFile.getName());
-
-    MultipartBodyBuilder builder = new MultipartBodyBuilder();
-    builder.part("file", new org.springframework.core.io.FileSystemResource(wavFile));
-    builder.part("model", "whisper-large-v3");
-
-    TranscriptionResponse response =
-        restClient
-            .post()
-            .uri("/openai/v1/audio/transcriptions")
-            .contentType(MediaType.MULTIPART_FORM_DATA)
-            .body(builder.build())
-            .retrieve()
-            .body(TranscriptionResponse.class);
-
-    if (response == null || response.text() == null) {
-      log.error("Groq: resposta inválida na transcrição");
-      throw new IllegalStateException("Falha na transcrição — resposta inválida");
+    // ✅ Construtor principal usado pelo Spring
+    @Autowired
+    public GroqClient(@Value("${groq.api.key}") String apiKey) {
+        this.restClient =
+                RestClient.builder()
+                        .baseUrl("https://api.groq.com")
+                        .defaultHeader("Authorization", "Bearer " + apiKey)
+                        .build();
     }
 
-    return response.text();
-  }
-
-  public String refinarTexto(String textoBruto) {
-    if (textoBruto.length() > 5000) {
-      throw new IllegalArgumentException("Texto muito longo para refinamento automático");
+    // ✅ Construtor alternativo para testes (sem apiKey, apenas RestClient mockado)
+    public GroqClient(RestClient restClient) {
+        this.restClient = restClient;
     }
 
-    log.debug("Refinando texto via Llama 3.1");
+    public String transcrever(File wavFile) {
+        log.info("Iniciando transcrição via Groq (Whisper) para o arquivo: {}", wavFile.getName());
 
-    var payload =
-        Map.of(
-            "model",
-            "llama-3.1-8b-instant",
-            "messages",
-            List.of(
+        MultipartBodyBuilder builder = new MultipartBodyBuilder();
+        builder.part("file", new org.springframework.core.io.FileSystemResource(wavFile));
+        builder.part("model", "whisper-large-v3");
+
+        TranscriptionResponse response =
+                restClient
+                        .post()
+                        .uri("/openai/v1/audio/transcriptions")
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .body(builder.build())
+                        .retrieve()
+                        .body(TranscriptionResponse.class);
+
+        if (response == null || response.text() == null) {
+            log.error("Groq: resposta inválida na transcrição");
+            throw new IllegalStateException("Falha na transcrição — resposta inválida");
+        }
+
+        return response.text();
+    }
+
+    public String refinarTexto(String textoBruto) {
+        if (textoBruto.length() > 5000) {
+            throw new IllegalArgumentException("Texto muito longo para refinamento automático");
+        }
+
+        log.debug("Refinando texto via Llama 3.1");
+
+        var payload =
                 Map.of(
-                    "role",
-                    "system",
-                    "content",
-                    "Corrija a pontuação e remova vícios de fala. Retorne apenas o texto limpo."),
-                Map.of("role", "user", "content", textoBruto)),
-            "temperature",
-            0.3);
+                        "model",
+                        "llama-3.1-8b-instant",
+                        "messages",
+                        List.of(
+                                Map.of(
+                                        "role",
+                                        "system",
+                                        "content",
+                                        "Corrija a pontuação e remova vícios de fala. Retorne"
+                                                + " apenas o texto limpo."),
+                                Map.of("role", "user", "content", textoBruto)),
+                        "temperature",
+                        0.3);
 
-    ChatCompletionResponse response =
-        restClient
-            .post()
-            .uri("/openai/v1/chat/completions")
-            .contentType(MediaType.APPLICATION_JSON)
-            .body(payload)
-            .retrieve()
-            .body(ChatCompletionResponse.class);
+        ChatCompletionResponse response =
+                restClient
+                        .post()
+                        .uri("/openai/v1/chat/completions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(payload)
+                        .retrieve()
+                        .body(ChatCompletionResponse.class);
 
-    if (response == null || response.choices().isEmpty()) {
-      log.error("Groq: resposta inválida no refinamento");
-      throw new IllegalStateException("Falha no refinamento — resposta inválida");
+        if (response == null || response.choices().isEmpty()) {
+            log.error("Groq: resposta inválida no refinamento");
+            throw new IllegalStateException("Falha no refinamento — resposta inválida");
+        }
+
+        return response.choices().get(0).message().content();
     }
-
-    return response.choices().get(0).message().content();
-  }
 }

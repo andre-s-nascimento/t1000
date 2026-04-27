@@ -17,31 +17,31 @@ import net.ddns.adambravo79.tmill.telegram.TelegramFacade;
 @RequiredArgsConstructor
 public class TelegramFileService {
 
-  private final TelegramFacade telegramFacade;
+    private final TelegramFacade telegramFacade;
 
-  /**
-   * Baixa um arquivo do Telegram dado o fileId. Nunca retorna null — sempre lança exceção em caso
-   * de falha.
-   */
-  public File baixarArquivo(String fileId) {
-    try {
-      log.debug("Baixando arquivo do Telegram fileId={}", fileId);
+    /**
+     * Baixa um arquivo do Telegram dado o fileId. Nunca retorna null — sempre lança exceção em caso
+     * de falha.
+     */
+    public File baixarArquivo(String fileId) {
+        try {
+            log.debug("Baixando arquivo do Telegram fileId={}", fileId);
 
-      // Usa o método utilitário do facade
-      org.telegram.telegrambots.meta.api.objects.File tgFile =
-          telegramFacade.getFile(new GetFile(fileId));
+            // Usa o método utilitário do facade
+            org.telegram.telegrambots.meta.api.objects.File tgFile =
+                    telegramFacade.getFile(new GetFile(fileId));
 
-      File localFile = telegramFacade.downloadFile(tgFile);
+            File localFile = telegramFacade.downloadFile(tgFile);
 
-      if (localFile == null || !localFile.exists()) {
-        throw new TelegramFileException("Arquivo não encontrado após download", null);
-      }
+            if (localFile == null || !localFile.exists()) {
+                throw new TelegramFileException("Arquivo não encontrado após download", null);
+            }
 
-      return localFile;
+            return localFile;
 
-    } catch (TelegramApiException e) {
-      log.error("Erro ao baixar arquivo fileId={}", fileId, e);
-      throw new TelegramFileException("Falha ao baixar arquivo do Telegram", e);
+        } catch (TelegramApiException e) {
+            log.error("Erro ao baixar arquivo fileId={}", fileId, e);
+            throw new TelegramFileException("Falha ao baixar arquivo do Telegram", e);
+        }
     }
-  }
 }

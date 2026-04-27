@@ -12,20 +12,20 @@ import net.ddns.adambravo79.tmill.controller.TelegramController;
 
 class BotRunnerTest {
 
-  @Test
-  void deveRegistrarBotComSucesso() throws Exception {
-    TelegramController controller = mock(TelegramController.class);
+    @Test
+    void deveRegistrarBotComSucesso() throws Exception {
+        TelegramController controller = mock(TelegramController.class);
 
-    try (MockedConstruction<TelegramBotsLongPollingApplication> mocked =
-        Mockito.mockConstruction(TelegramBotsLongPollingApplication.class)) {
+        try (MockedConstruction<TelegramBotsLongPollingApplication> mocked =
+                Mockito.mockConstruction(TelegramBotsLongPollingApplication.class)) {
 
-      BotRunner runner = new BotRunner(controller, "token-teste");
-      runner.setKeepAlive(false); // evita bloqueio no join
+            BotRunner runner = new BotRunner(controller, "token-teste");
+            runner.setKeepAlive(false); // evita bloqueio no join
 
-      runner.run();
+            runner.run();
 
-      TelegramBotsLongPollingApplication botApp = mocked.constructed().get(0);
-      verify(botApp).registerBot("token-teste", controller);
+            TelegramBotsLongPollingApplication botApp = mocked.constructed().get(0);
+            verify(botApp).registerBot("token-teste", controller);
+        }
     }
-  }
 }

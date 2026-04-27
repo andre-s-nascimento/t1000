@@ -21,91 +21,93 @@ import net.ddns.adambravo79.tmill.model.TranscriptionResponse;
 
 class GroqClientTest {
 
-  private RestClient restClient;
-  private RestClient.RequestBodyUriSpec uriSpec;
-  private RestClient.RequestBodySpec bodySpec;
-  private RestClient.ResponseSpec responseSpec;
+    private RestClient restClient;
+    private RestClient.RequestBodyUriSpec uriSpec;
+    private RestClient.RequestBodySpec bodySpec;
+    private RestClient.ResponseSpec responseSpec;
 
-  @BeforeEach
-  void setUp() {
-    restClient = mock(RestClient.class);
-    uriSpec = mock(RestClient.RequestBodyUriSpec.class);
-    bodySpec = mock(RestClient.RequestBodySpec.class);
-    responseSpec = mock(RestClient.ResponseSpec.class);
+    @BeforeEach
+    void setUp() {
+        restClient = mock(RestClient.class);
+        uriSpec = mock(RestClient.RequestBodyUriSpec.class);
+        bodySpec = mock(RestClient.RequestBodySpec.class);
+        responseSpec = mock(RestClient.ResponseSpec.class);
 
-    when(restClient.post()).thenReturn(uriSpec);
+        when(restClient.post()).thenReturn(uriSpec);
 
-    // ✅ Cobre body(MultiValueMap) — chamado por transcrever()
-    lenient().doReturn(bodySpec).when(bodySpec).body(any(MultiValueMap.class));
-    // ✅ Cobre body(Object) — chamado por refinarTexto() com Map
-    lenient().doReturn(bodySpec).when(bodySpec).body(any(Object.class));
+        // ✅ Cobre body(MultiValueMap) — chamado por transcrever()
+        lenient().doReturn(bodySpec).when(bodySpec).body(any(MultiValueMap.class));
+        // ✅ Cobre body(Object) — chamado por refinarTexto() com Map
+        lenient().doReturn(bodySpec).when(bodySpec).body(any(Object.class));
 
-    lenient().doReturn(responseSpec).when(bodySpec).retrieve();
-  }
+        lenient().doReturn(responseSpec).when(bodySpec).retrieve();
+    }
 
-  // --- transcrever ---
+    // --- transcrever ---
 
-  private void stubTranscricaoUri() {
-    when(uriSpec.uri("/openai/v1/audio/transcriptions")).thenReturn(bodySpec);
-    lenient().doReturn(bodySpec).when(bodySpec).contentType(MediaType.MULTIPART_FORM_DATA);
-  }
+    private void stubTranscricaoUri() {
+        when(uriSpec.uri("/openai/v1/audio/transcriptions")).thenReturn(bodySpec);
+        lenient().doReturn(bodySpec).when(bodySpec).contentType(MediaType.MULTIPART_FORM_DATA);
+    }
 
-  @Test
-  void deveTranscreverComSucesso() {
-    stubTranscricaoUri();
+    @Test
+    void deveTranscreverComSucesso() {
+        stubTranscricaoUri();
 
-    var resp = mock(TranscriptionResponse.class);
-    when(resp.text()).thenReturn("Texto transcrito");
-    when(responseSpec.body(TranscriptionResponse.class)).thenReturn(resp);
+        var resp = mock(TranscriptionResponse.class);
+        when(resp.text()).thenReturn("Texto transcrito");
+        when(responseSpec.body(TranscriptionResponse.class)).thenReturn(resp);
 
-    assertThat(new GroqClient(restClient).transcrever(new File("teste.wav")))
-        .isEqualTo("Texto transcrito");
-  }
+        assertThat(new GroqClient(restClient).transcrever(new File("teste.wav")))
+                .isEqualTo("Texto transcrito");
+    }
 
-  @Test
-  void deveFalharQuandoTranscricaoInvalida() {
-    stubTranscricaoUri();
-    when(responseSpec.body(TranscriptionResponse.class)).thenReturn(null);
+    @Test
+    void deveFalharQuandoTranscricaoInvalida() {
+        stubTranscricaoUri();
+        when(responseSpec.body(TranscriptionResponse.class)).thenReturn(null);
 
-    assertThatExceptionOfType(IllegalStateException.class)
-        .isThrownBy(() -> new GroqClient(restClient).transcrever(new File("teste.wav")))
-        .withMessageContaining("Falha na transcrição");
-  }
+        assertThatExceptionOfType(IllegalStateException.class)
+                .isThrownBy(() -> new GroqClient(restClient).transcrever(new File("teste.wav")))
+                .withMessageContaining("Falha na transcrição");
+    }
 
-  // --- refinarTexto ---
+    // --- refinarTexto ---
 
-  private void stubRefinoUri() {
-    when(uriSpec.uri("/openai/v1/chat/completions")).thenReturn(bodySpec);
-    lenient().doReturn(bodySpec).when(bodySpec).contentType(MediaType.APPLICATION_JSON);
-  }
+    private void stubRefinoUri() {
+        when(uriSpec.uri("/openai/v1/chat/completions")).thenReturn(bodySpec);
+        lenient().doReturn(bodySpec).when(bodySpec).contentType(MediaType.APPLICATION_JSON);
+    }
 
-  @Test
-  void deveRefinarTextoComSucesso() {
-    stubRefinoUri();
+    @Test
+    void deveRefinarTextoComSucesso() {
+        stubRefinoUri();
 
-    var resp =
-        new ChatCompletionResponse(List.of(new Choice(new Message("assistant", "Texto refinado"))));
-    when(responseSpec.body(ChatCompletionResponse.class)).thenReturn(resp);
+        var resp =
+                new ChatCompletionResponse(
+                        List.of(new Choice(new Message("assistant", "Texto refinado"))));
+        when(responseSpec.body(ChatCompletionResponse.class)).thenReturn(resp);
 
-    assertThat(new GroqClient(restClient).refinarTexto("Texto bruto")).isEqualTo("Texto refinado");
-  }
+        assertThat(new GroqClient(restClient).refinarTexto("Texto bruto"))
+                .isEqualTo("Texto refinado");
+    }
 
-  @Test
-  void deveFalharQuandoRefinoInvalido() {
-    stubRefinoUri();
-    when(responseSpec.body(ChatCompletionResponse.class)).thenReturn(null);
+    @Test
+    void deveFalharQuandoRefinoInvalido() {
+        stubRefinoUri();
+        when(responseSpec.body(ChatCompletionResponse.class)).thenReturn(null);
 
-    assertThatExceptionOfType(IllegalStateException.class)
-        .isThrownBy(() -> new GroqClient(restClient).refinarTexto("Texto bruto"))
-        .withMessageContaining("Falha no refinamento");
-  }
+        assertThatExceptionOfType(IllegalStateException.class)
+                .isThrownBy(() -> new GroqClient(restClient).refinarTexto("Texto bruto"))
+                .withMessageContaining("Falha no refinamento");
+    }
 
-  // --- validação de entrada ---
+    // --- validação de entrada ---
 
-  @Test
-  void deveFalharQuandoTextoMuitoLongo() {
-    assertThatExceptionOfType(IllegalArgumentException.class)
-        .isThrownBy(() -> new GroqClient(restClient).refinarTexto("x".repeat(6000)))
-        .withMessageContaining("Texto muito longo");
-  }
+    @Test
+    void deveFalharQuandoTextoMuitoLongo() {
+        assertThatExceptionOfType(IllegalArgumentException.class)
+                .isThrownBy(() -> new GroqClient(restClient).refinarTexto("x".repeat(6000)))
+                .withMessageContaining("Texto muito longo");
+    }
 }

@@ -20,51 +20,51 @@ import net.ddns.adambravo79.tmill.exception.AudioProcessingException;
 @Service
 public class AudioService {
 
-  @Async
-  public CompletableFuture<File> converterParaWav(File ogaFile) {
-    File wavFile = new File(ogaFile.getAbsolutePath().replace(".oga", ".wav"));
+    @Async
+    public CompletableFuture<File> converterParaWav(File ogaFile) {
+        File wavFile = new File(ogaFile.getAbsolutePath().replace(".oga", ".wav"));
 
-    try {
-      ProcessBuilder pb =
-          new ProcessBuilder(
-              "ffmpeg",
-              "-y",
-              "-i",
-              ogaFile.getAbsolutePath(),
-              "-ar",
-              "16000",
-              "-ac",
-              "1",
-              wavFile.getAbsolutePath());
+        try {
+            ProcessBuilder pb =
+                    new ProcessBuilder(
+                            "ffmpeg",
+                            "-y",
+                            "-i",
+                            ogaFile.getAbsolutePath(),
+                            "-ar",
+                            "16000",
+                            "-ac",
+                            "1",
+                            wavFile.getAbsolutePath());
 
-      pb.redirectErrorStream(true);
+            pb.redirectErrorStream(true);
 
-      log.info("FFmpeg: Iniciando conversão de {}...", ogaFile.getName());
+            log.info("FFmpeg: Iniciando conversão de {}...", ogaFile.getName());
 
-      Process p = startProcess(pb);
+            Process p = startProcess(pb);
 
-      boolean finished = p.waitFor(30, TimeUnit.SECONDS);
+            boolean finished = p.waitFor(30, TimeUnit.SECONDS);
 
-      if (finished && p.exitValue() == 0) {
-        log.info("FFmpeg: Conversão concluída com sucesso.");
-        return CompletableFuture.completedFuture(wavFile);
-      }
+            if (finished && p.exitValue() == 0) {
+                log.info("FFmpeg: Conversão concluída com sucesso.");
+                return CompletableFuture.completedFuture(wavFile);
+            }
 
-      log.error("FFmpeg: Falha na conversão ou timeout.");
-      return CompletableFuture.failedFuture(new AudioProcessingException("FFmpeg falhou"));
+            log.error("FFmpeg: Falha na conversão ou timeout.");
+            return CompletableFuture.failedFuture(new AudioProcessingException("FFmpeg falhou"));
 
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt(); // 🔥 obrigatório
-      return CompletableFuture.failedFuture(
-          new AudioProcessingException("Processo interrompido", e));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt(); // 🔥 obrigatório
+            return CompletableFuture.failedFuture(
+                    new AudioProcessingException("Processo interrompido", e));
 
-    } catch (Exception e) {
-      log.error("Erro crítico no AudioService", e);
-      return CompletableFuture.failedFuture(new AudioProcessingException("FFmpeg falhou", e));
+        } catch (Exception e) {
+            log.error("Erro crítico no AudioService", e);
+            return CompletableFuture.failedFuture(new AudioProcessingException("FFmpeg falhou", e));
+        }
     }
-  }
 
-  protected Process startProcess(ProcessBuilder pb) throws IOException {
-    return pb.start();
-  }
+    protected Process startProcess(ProcessBuilder pb) throws IOException {
+        return pb.start();
+    }
 }
