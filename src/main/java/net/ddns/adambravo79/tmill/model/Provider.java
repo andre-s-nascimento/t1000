@@ -15,6 +15,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record Provider(
-        @JsonProperty("provider_name") String name,
-        @JsonProperty("provider_id") Integer id,
-        @JsonProperty("logo_path") String logoPath) {}
+    @JsonProperty("provider_name") String name,
+    @JsonProperty("provider_id") Integer id,
+    @JsonProperty("logo_path") String logoPath) {}

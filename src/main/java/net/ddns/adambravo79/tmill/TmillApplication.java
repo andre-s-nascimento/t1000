@@ -18,12 +18,12 @@ import org.springframework.scheduling.annotation.EnableAsync;
 @SpringBootApplication(scanBasePackages = "net.ddns.adambravo79.tmill")
 public class TmillApplication {
 
-    /**
-     * Ponto de entrada da aplicação Spring Boot.
-     *
-     * @param args argumentos de linha de comando.
-     */
-    public static void main(String[] args) {
-        SpringApplication.run(TmillApplication.class, args);
-    }
+  /**
+   * Ponto de entrada da aplicação Spring Boot.
+   *
+   * @param args argumentos de linha de comando.
+   */
+  public static void main(String[] args) {
+    SpringApplication.run(TmillApplication.class, args);
+  }
 }

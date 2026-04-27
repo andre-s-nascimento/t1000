@@ -1,11 +1,9 @@
 /* (c) 2026 | 27/04/2026 */
-package net.ddns.adambravo79.tmill.service;
+package net.ddns.adambravo79.tmill.cache;
 
 import java.util.concurrent.ConcurrentHashMap;
-
-import org.springframework.stereotype.Component;
-
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
 
 /**
  * Cache em memória que guarda a última transcrição refinada por chatId.
@@ -21,47 +19,41 @@ import lombok.extern.slf4j.Slf4j;
 @Component
 public class TranscricaoCache {
 
-    // Mapeamento: chatId → texto refinado da última transcrição
-    private final ConcurrentHashMap<Long, String> cache = new ConcurrentHashMap<>();
+  // Mapeamento: chatId → texto refinado da última transcrição
+  private final ConcurrentHashMap<Long, String> cache = new ConcurrentHashMap<>();
 
-    /**
-     * Salva a transcrição refinada associada a um chatId.
-     *
-     * @param chatId identificador único do chat.
-     * @param textoRefinado texto refinado da transcrição.
-     */
-    public void salvar(long chatId, String textoRefinado) {
-        cache.put(chatId, textoRefinado);
-        log.debug("Cache: Transcrição salva para chatId={}", chatId);
-    }
+  public void salvar(long chatId, String textoRefinado) {
+    cache.put(chatId, textoRefinado);
+    log.debug("Cache: Transcrição salva para chatId={}", chatId);
+  }
 
-    /**
-     * Recupera a transcrição refinada associada a um chatId.
-     *
-     * @param chatId identificador único do chat.
-     * @return texto refinado ou {@code null} se não existir.
-     */
-    public String recuperar(long chatId) {
-        return cache.get(chatId);
-    }
+  /**
+   * Recupera a transcrição refinada associada a um chatId.
+   *
+   * @param chatId identificador único do chat.
+   * @return texto refinado ou {@code null} se não existir.
+   */
+  public String recuperar(long chatId) {
+    return cache.get(chatId);
+  }
 
-    /**
-     * Remove a transcrição associada a um chatId.
-     *
-     * @param chatId identificador único do chat.
-     */
-    public void remover(long chatId) {
-        cache.remove(chatId);
-        log.debug("Cache: Transcrição removida para chatId={}", chatId);
-    }
+  /**
+   * Remove a transcrição associada a um chatId.
+   *
+   * @param chatId identificador único do chat.
+   */
+  public void remover(long chatId) {
+    cache.remove(chatId);
+    log.debug("Cache: Transcrição removida para chatId={}", chatId);
+  }
 
-    /**
-     * Verifica se existe uma transcrição associada a um chatId.
-     *
-     * @param chatId identificador único do chat.
-     * @return {@code true} se existir, {@code false} caso contrário.
-     */
-    public boolean existe(long chatId) {
-        return cache.containsKey(chatId);
-    }
+  /**
+   * Verifica se existe uma transcrição associada a um chatId.
+   *
+   * @param chatId identificador único do chat.
+   * @return {@code true} se existir, {@code false} caso contrário.
+   */
+  public boolean existe(long chatId) {
+    return cache.containsKey(chatId);
+  }
 }
