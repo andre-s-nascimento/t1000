@@ -21,7 +21,7 @@
   },
   "lint-staged": {
     "*.java": [
-      "bash -c './gradlew spotlessApply > /dev/null'"
+      "bash -c './gradlew spotlessApply --no-configuration-cache > /dev/null'"
     ],
     "*.{js,ts}": [
       "eslint --fix"

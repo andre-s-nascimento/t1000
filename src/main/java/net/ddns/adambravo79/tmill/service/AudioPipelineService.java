@@ -2,6 +2,10 @@
 package net.ddns.adambravo79.tmill.service;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.concurrent.CompletionException;
 import java.util.function.BiConsumer;
 
 import org.springframework.stereotype.Service;
@@ -9,63 +13,89 @@ import org.springframework.stereotype.Service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.ddns.adambravo79.tmill.client.GroqClient;
+import net.ddns.adambravo79.tmill.exception.AudioProcessingException;
 
-/**
- * Orquestrador que une a conversão de áudio local com a inteligência na nuvem.
- *
- * <p>ATUALIZADO: Agora usa BiConsumer<String, Boolean> como callback: - O primeiro parâmetro é o
- * texto da mensagem a enviar. - O segundo (isUltimaMensagem) indica se é a mensagem final da
- * transcrição, momento em que o TelegramController deve anexar os botões de ação.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AudioPipelineService {
 
-  private final AudioService audioService;
-  private final GroqClient groqClient;
-  private final TranscricaoCache transcricaoCache;
+    private final AudioService audioService;
+    private final GroqClient groqClient;
+    private final TranscricaoCache transcricaoCache;
 
-  /**
-   * @param ogaFile Arquivo de áudio original baixado do Telegram
-   * @param chatId ID do chat, necessário para salvar no cache
-   * @param callback BiConsumer<textoMensagem, isUltimaMensagem>
-   */
-  public void processarFluxoAudio(File ogaFile, long chatId, BiConsumer<String, Boolean> callback) {
-    log.info("Iniciando fluxo de processamento para: {}", ogaFile.getName());
+    public void processarFluxoAudio(
+            File ogaFile, long chatId, BiConsumer<String, Boolean> callback) {
+        log.info("Iniciando fluxo de processamento para: {}", ogaFile.getName());
 
-    audioService
-        .converterParaWav(ogaFile)
-        .thenAccept(
-            wavFile -> {
-              // Passo 1: Transcrever e enviar o bruto imediatamente
-              String bruto = groqClient.transcrever(wavFile);
-              callback.accept("🎙️ *Bruto:* \n_" + bruto + "_", false);
+        try {
+            audioService
+                    .converterParaWav(ogaFile)
+                    .thenAccept(
+                            wavFile -> {
+                                try {
+                                    String bruto = groqClient.transcrever(wavFile);
+                                    callback.accept("🎙️ *Bruto:* \n_" + bruto + "_", false);
 
-              // Passo 2: Refinar
-              String refinado = groqClient.refinarTexto(bruto);
+                                    String refinado = groqClient.refinarTexto(bruto);
+                                    transcricaoCache.salvar(chatId, refinado);
+                                    callback.accept("✨ *Refinado:* \n" + refinado, true);
 
-              // Salva o texto refinado no cache para uso futuro pelo botão
-              transcricaoCache.salvar(chatId, refinado);
+                                } catch (AudioProcessingException e) {
+                                    // já é do tipo certo — relança como CompletionException para o
+                                    // join()
+                                    throw new CompletionException(e);
+                                } catch (Exception e) {
+                                    // embrulha qualquer outra exceção
+                                    throw new CompletionException(
+                                            new AudioProcessingException(
+                                                    "Falha no pipeline de áudio para arquivo: "
+                                                            + wavFile.getName(),
+                                                    e));
+                                } finally {
+                                    deletarSilenciosamente(wavFile);
+                                }
+                            })
+                    .exceptionally(
+                            ex -> {
+                                // CompletableFuture.failedFuture() chega aqui com a causa direto
+                                Throwable causa =
+                                        (ex instanceof CompletionException && ex.getCause() != null)
+                                                ? ex.getCause()
+                                                : ex;
 
-              // Envia o refinado e sinaliza que é a última mensagem (true)
-              // O controller vai anexar os botões nessa mensagem
-              callback.accept("✨ *Refinado:* \n" + refinado, true);
+                                if (causa instanceof AudioProcessingException) {
+                                    throw new CompletionException(causa);
+                                }
 
-              // Cleanup do arquivo temporário WAV
-              wavFile.delete();
-            })
-        .exceptionally(
-            ex -> {
-              log.error("Falha no pipeline de áudio", ex);
-              callback.accept("⚠️ Falha no processamento do áudio.", false);
-              return null;
-            })
-        .thenRun(
-            () -> {
-              // Cleanup do arquivo original OGA
-              ogaFile.delete();
-              log.debug("Limpeza de arquivos temporários concluída.");
-            });
-  }
+                                throw new CompletionException(
+                                        new AudioProcessingException(
+                                                "Erro inesperado no pipeline de áudio para arquivo:"
+                                                        + " "
+                                                        + ogaFile.getName(),
+                                                causa));
+                            })
+                    .thenRun(() -> deletarSilenciosamente(ogaFile))
+                    .join(); // propaga CompletionException para cá
+
+        } catch (CompletionException e) {
+            // ✅ Desembrulha: join() sempre embrulha em CompletionException
+            Throwable causa = e.getCause() != null ? e.getCause() : e;
+            if (causa instanceof AudioProcessingException ape) {
+                throw ape;
+            }
+            throw new AudioProcessingException(
+                    "Erro inesperado no pipeline de áudio para arquivo: " + ogaFile.getName(),
+                    causa);
+        }
+    }
+
+    private void deletarSilenciosamente(File file) {
+        try {
+            Files.delete(Path.of(file.getAbsolutePath()));
+            log.debug("Arquivo temporário excluído: {}", file.getAbsolutePath());
+        } catch (IOException ex) {
+            log.warn("Não foi possível excluir arquivo temporário: {}", file.getAbsolutePath(), ex);
+        }
+    }
 }

@@ -12,17 +12,17 @@ import org.springframework.core.task.support.TaskExecutorAdapter;
 @Configuration
 public class AppConfig {
 
-  @Value("${bot.token}")
-  private String botToken;
+    @Value("${bot.token}")
+    private String botToken;
 
-  @Bean
-  public String botToken() {
-    return this.botToken;
-  }
+    @Bean
+    public String botToken() {
+        return this.botToken;
+    }
 
-  @Bean
-  public AsyncTaskExecutor applicationTaskExecutor() {
-    // Isso força o Spring a usar Virtual Threads para qualquer @Async
-    return new TaskExecutorAdapter(Executors.newVirtualThreadPerTaskExecutor());
-  }
+    @Bean
+    public AsyncTaskExecutor applicationTaskExecutor() {
+        // Isso força o Spring a usar Virtual Threads para qualquer @Async
+        return new TaskExecutorAdapter(Executors.newVirtualThreadPerTaskExecutor());
+    }
 }

@@ -19,24 +19,24 @@ import lombok.extern.slf4j.Slf4j;
 @Component
 public class TranscricaoCache {
 
-  // chatId → texto refinado da última transcrição
-  private final ConcurrentHashMap<Long, String> cache = new ConcurrentHashMap<>();
+    // chatId → texto refinado da última transcrição
+    private final ConcurrentHashMap<Long, String> cache = new ConcurrentHashMap<>();
 
-  public void salvar(long chatId, String textoRefinado) {
-    cache.put(chatId, textoRefinado);
-    log.debug("Cache: Transcrição salva para chatId={}", chatId);
-  }
+    public void salvar(long chatId, String textoRefinado) {
+        cache.put(chatId, textoRefinado);
+        log.debug("Cache: Transcrição salva para chatId={}", chatId);
+    }
 
-  public String recuperar(long chatId) {
-    return cache.get(chatId);
-  }
+    public String recuperar(long chatId) {
+        return cache.get(chatId);
+    }
 
-  public void remover(long chatId) {
-    cache.remove(chatId);
-    log.debug("Cache: Transcrição removida para chatId={}", chatId);
-  }
+    public void remover(long chatId) {
+        cache.remove(chatId);
+        log.debug("Cache: Transcrição removida para chatId={}", chatId);
+    }
 
-  public boolean existe(long chatId) {
-    return cache.containsKey(chatId);
-  }
+    public boolean existe(long chatId) {
+        return cache.containsKey(chatId);
+    }
 }

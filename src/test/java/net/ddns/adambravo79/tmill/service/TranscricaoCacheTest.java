@@ -7,16 +7,16 @@ import org.junit.jupiter.api.Test;
 
 class TranscricaoCacheTest {
 
-  @Test
-  void deveSalvarRecuperarRemover() {
-    var cache = new TranscricaoCache();
+    @Test
+    void deveSalvarRecuperarRemover() {
+        var cache = new TranscricaoCache();
 
-    cache.salvar(1L, "texto");
+        cache.salvar(1L, "texto");
 
-    assertThat(cache.recuperar(1L)).isEqualTo("texto");
+        assertThat(cache.recuperar(1L)).isEqualTo("texto");
 
-    cache.remover(1L);
+        cache.remover(1L);
 
-    assertThat(cache.recuperar(1L)).isNull();
-  }
+        assertThat(cache.recuperar(1L)).isNull();
+    }
 }

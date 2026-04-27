@@ -10,27 +10,27 @@ import lombok.extern.slf4j.Slf4j;
 @Component
 public class TelegramSafeExecutor {
 
-  public void run(Long chatId, TelegramSender fallback, TelegramAction action) {
-    try {
-      action.run();
+    public void run(Long chatId, TelegramSender fallback, TelegramAction action) {
+        try {
+            action.run();
 
-    } catch (TelegramApiException e) {
-      log.error("telegram_error chatId={} msg={}", chatId, e.getMessage(), e);
+        } catch (TelegramApiException e) {
+            log.error("telegram_error chatId={} msg={}", chatId, e.getMessage(), e);
 
-      try {
-        fallback.enviar(chatId, "⚠️ Erro ao enviar mensagem. Tente novamente.");
-      } catch (Exception fallbackError) {
-        log.error("fallback_error chatId={}", chatId, fallbackError);
-      }
+            try {
+                fallback.enviar(chatId, "⚠️ Erro ao enviar mensagem. Tente novamente.");
+            } catch (Exception fallbackError) {
+                log.error("fallback_error chatId={}", chatId, fallbackError);
+            }
 
-    } catch (Exception e) {
-      log.error("unexpected_error chatId={}", chatId, e);
+        } catch (Exception e) {
+            log.error("unexpected_error chatId={}", chatId, e);
 
-      try {
-        fallback.enviar(chatId, "⚠️ Erro inesperado.");
-      } catch (Exception fallbackError) {
-        log.error("fallback_error chatId={}", chatId, fallbackError);
-      }
+            try {
+                fallback.enviar(chatId, "⚠️ Erro inesperado.");
+            } catch (Exception fallbackError) {
+                log.error("fallback_error chatId={}", chatId, fallbackError);
+            }
+        }
     }
-  }
 }

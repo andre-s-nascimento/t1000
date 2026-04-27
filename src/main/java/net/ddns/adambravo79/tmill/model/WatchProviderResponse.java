@@ -9,4 +9,4 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 // Estrutura para /movie/{id}/watch/providers
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record WatchProviderResponse(
-    @JsonProperty("results") Map<String, CountryProviders> results) {}
+        @JsonProperty("results") Map<String, CountryProviders> results) {}
