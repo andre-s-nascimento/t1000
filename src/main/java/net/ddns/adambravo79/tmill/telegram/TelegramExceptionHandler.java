@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import lombok.extern.slf4j.Slf4j;
-import net.ddns.adambravo79.tmill.config.AudioProcessingException;
+import net.ddns.adambravo79.tmill.exception.AudioProcessingException;
 
 @Slf4j
 @Component

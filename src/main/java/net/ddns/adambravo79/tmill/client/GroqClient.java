@@ -1,10 +1,11 @@
-/* (c) 2026 */
+/* (c) 2026-2026 */
 package net.ddns.adambravo79.tmill.client;
 
 import java.io.File;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.MultipartBodyBuilder;
@@ -21,12 +22,19 @@ public class GroqClient {
 
   private final RestClient restClient;
 
+  // ✅ Construtor principal usado pelo Spring
+  @Autowired
   public GroqClient(@Value("${groq.api.key}") String apiKey) {
     this.restClient =
         RestClient.builder()
             .baseUrl("https://api.groq.com")
             .defaultHeader("Authorization", "Bearer " + apiKey)
             .build();
+  }
+
+  // ✅ Construtor alternativo para testes (sem apiKey, apenas RestClient mockado)
+  public GroqClient(RestClient restClient) {
+    this.restClient = restClient;
   }
 
   public String transcrever(File wavFile) {

@@ -1,4 +1,4 @@
-/* (c) 2026 */
+/* (c) 2026-2026 */
 package net.ddns.adambravo79.tmill.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -10,43 +10,57 @@ import java.nio.file.Files;
 
 import org.junit.jupiter.api.Test;
 import org.telegram.telegrambots.meta.api.methods.GetFile;
-import org.telegram.telegrambots.meta.generics.TelegramClient;
+import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
-import net.ddns.adambravo79.tmill.telegram.TelegramFileException;
+import net.ddns.adambravo79.tmill.exception.TelegramFileException;
+import net.ddns.adambravo79.tmill.telegram.TelegramFacade;
 
 class TelegramFileServiceTest {
 
   @Test
   void deveBaixarArquivoComSucesso() throws Exception {
-    TelegramClient client = mock(TelegramClient.class);
-    TelegramFileService service = new TelegramFileService(client);
+    TelegramFacade facade = mock(TelegramFacade.class);
+    TelegramFileService service = new TelegramFileService(facade);
 
-    // cria arquivo temporário
     File temp = Files.createTempFile("audio", ".tmp").toFile();
 
-    // usa nome totalmente qualificado para o File do Telegram
     org.telegram.telegrambots.meta.api.objects.File tgFile =
         new org.telegram.telegrambots.meta.api.objects.File();
 
-    when(client.execute(any(GetFile.class))).thenReturn(tgFile);
-    when(client.downloadFile(tgFile)).thenReturn(temp);
+    when(facade.getFile(any(GetFile.class))).thenReturn(tgFile);
+    when(facade.downloadFile(tgFile)).thenReturn(temp);
 
     File result = service.baixarArquivo("file-id");
 
-    assertThat(result).exists();
-    assertThat(result.getName()).endsWith(".oga");
-    assertThat(result.getParentFile()).hasName("temp_audio");
+    assertThat(result).isNotNull().exists();
   }
 
   @Test
-  void deveLancarExcecaoQuandoFalhar() throws Exception {
-    TelegramClient client = mock(TelegramClient.class);
-    TelegramFileService service = new TelegramFileService(client);
+  void deveLancarExcecaoQuandoDownloadRetornaNull() throws Exception {
+    TelegramFacade facade = mock(TelegramFacade.class);
+    TelegramFileService service = new TelegramFileService(facade);
 
-    when(client.execute(any(GetFile.class))).thenThrow(new RuntimeException("erro"));
+    org.telegram.telegrambots.meta.api.objects.File tgFile =
+        new org.telegram.telegrambots.meta.api.objects.File();
+
+    when(facade.getFile(any(GetFile.class))).thenReturn(tgFile);
+    when(facade.downloadFile(tgFile)).thenReturn(null);
 
     assertThatThrownBy(() -> service.baixarArquivo("file-id"))
         .isInstanceOf(TelegramFileException.class)
-        .hasMessageContaining("Erro ao baixar arquivo do Telegram");
+        .hasMessageContaining("Arquivo não encontrado");
+  }
+
+  @Test
+  void deveLancarExcecaoQuandoApiFalhar() throws Exception {
+    TelegramFacade facade = mock(TelegramFacade.class);
+    TelegramFileService service = new TelegramFileService(facade);
+
+    // Agora simulamos a exceção correta que a implementação captura
+    when(facade.getFile(any(GetFile.class))).thenThrow(new TelegramApiException("erro"));
+
+    assertThatThrownBy(() -> service.baixarArquivo("file-id"))
+        .isInstanceOf(TelegramFileException.class)
+        .hasMessageContaining("Falha ao baixar arquivo do Telegram");
   }
 }

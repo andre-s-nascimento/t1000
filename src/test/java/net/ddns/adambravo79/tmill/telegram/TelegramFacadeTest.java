@@ -1,4 +1,4 @@
-/* (c) 2026 */
+/* (c) 2026-2026 */
 package net.ddns.adambravo79.tmill.telegram;
 
 import static org.assertj.core.api.Assertions.*;
@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.telegram.telegrambots.meta.api.methods.GetFile;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
@@ -156,10 +157,48 @@ class TelegramFacadeTest {
     verify(client).execute(any(SendMessage.class));
   }
 
+  @Test
+  void deveObterArquivoViaGetFile() throws Exception {
+    TelegramClient client = mock(TelegramClient.class);
+    TelegramSafeExecutor executor = new TelegramSafeExecutor();
+    TelegramFacade facade = new TelegramFacade(client, executor);
+
+    GetFile getFile = new GetFile("fileId");
+    org.telegram.telegrambots.meta.api.objects.File tgFile =
+        new org.telegram.telegrambots.meta.api.objects.File();
+    tgFile.setFileId("fileId");
+
+    when(client.execute(getFile)).thenReturn(tgFile);
+
+    org.telegram.telegrambots.meta.api.objects.File result = facade.getFile(getFile);
+
+    assertThat(result.getFileId()).isEqualTo("fileId");
+    verify(client).execute(getFile);
+  }
+
+  @Test
+  void deveBaixarArquivo() throws Exception {
+    TelegramClient client = mock(TelegramClient.class);
+    TelegramSafeExecutor executor = new TelegramSafeExecutor();
+    TelegramFacade facade = new TelegramFacade(client, executor);
+
+    org.telegram.telegrambots.meta.api.objects.File tgFile =
+        new org.telegram.telegrambots.meta.api.objects.File();
+    tgFile.setFileId("fileId");
+
+    java.io.File fakeFile = new java.io.File("teste.txt");
+
+    when(client.downloadFile(tgFile)).thenReturn(fakeFile);
+
+    java.io.File result = facade.downloadFile(tgFile);
+
+    assertThat(result).hasName("teste.txt");
+    verify(client).downloadFile(tgFile);
+  }
+
   // =========================
   // TelegramExceptionHandler (Refatorado)
   // =========================
-
   @ParameterizedTest(name = "Erro {0} deve retornar mensagem contendo: {2}")
   @MethodSource("proverCenariosDeErro")
   void deveMapearErrosEspecificos(String nomeErro, Exception excecao, String mensagemEsperada)

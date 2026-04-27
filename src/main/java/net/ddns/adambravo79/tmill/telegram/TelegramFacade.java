@@ -2,6 +2,7 @@
 package net.ddns.adambravo79.tmill.telegram;
 
 import org.springframework.stereotype.Component;
+import org.telegram.telegrambots.meta.api.methods.GetFile;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
@@ -80,5 +81,15 @@ public class TelegramFacade {
 
           telegramClient.execute(msg);
         });
+  }
+
+  public org.telegram.telegrambots.meta.api.objects.File getFile(GetFile getFile)
+      throws TelegramApiException {
+    return telegramClient.execute(getFile);
+  }
+
+  public java.io.File downloadFile(org.telegram.telegrambots.meta.api.objects.File tgFile)
+      throws TelegramApiException {
+    return telegramClient.downloadFile(tgFile);
   }
 }

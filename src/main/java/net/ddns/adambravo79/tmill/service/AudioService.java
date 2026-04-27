@@ -10,7 +10,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import lombok.extern.slf4j.Slf4j;
-import net.ddns.adambravo79.tmill.config.AudioProcessingException;
+import net.ddns.adambravo79.tmill.exception.AudioProcessingException;
 
 /**
  * Service técnico para manipulação de arquivos de áudio via FFmpeg. Otimizado para rodar dentro do

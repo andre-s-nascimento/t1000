@@ -4,6 +4,7 @@ package net.ddns.adambravo79.tmill.client;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -29,6 +30,7 @@ public class TmdbClient {
 
   private final RestClient restClient;
 
+  @Autowired
   public TmdbClient(
       @Value("${tmdb.token}") String tmdbToken, @Value("${tmdb.api.url}") String apiUrl) {
     // Inicializa o RestClient com autenticação via Bearer Token e headers padrão
@@ -38,6 +40,10 @@ public class TmdbClient {
             .defaultHeader("Authorization", "Bearer " + tmdbToken)
             .defaultHeader("accept", "application/json")
             .build();
+  }
+
+  public TmdbClient(RestClient restClient) {
+    this.restClient = restClient;
   }
 
   /**

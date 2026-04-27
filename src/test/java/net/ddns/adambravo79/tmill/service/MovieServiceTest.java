@@ -2,6 +2,7 @@
 package net.ddns.adambravo79.tmill.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
@@ -13,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import net.ddns.adambravo79.tmill.client.TmdbClient;
+import net.ddns.adambravo79.tmill.exception.MovieNotFoundException;
 import net.ddns.adambravo79.tmill.model.CastRecord;
 import net.ddns.adambravo79.tmill.model.MovieRecord;
 import net.ddns.adambravo79.tmill.model.MovieSearchResponse;
@@ -25,12 +27,12 @@ class MovieServiceTest {
   @InjectMocks private MovieService movieService;
 
   @Test
-  void deveRetornarMensagemQuandoFilmeNaoEncontrado() {
+  void deveLancarExcecaoQuandoFilmeNaoEncontrado() {
     when(tmdbClient.pesquisarFilme("xyz")).thenReturn(null);
 
-    var response = movieService.executarBuscaFormatada("xyz");
-
-    assertThat(response.textoFormatado()).contains("Filme não encontrado");
+    assertThatThrownBy(() -> movieService.executarBuscaFormatada("xyz"))
+        .isInstanceOf(MovieNotFoundException.class)
+        .hasMessageContaining("Filme não encontrado");
   }
 
   @Test
@@ -77,12 +79,12 @@ class MovieServiceTest {
   }
 
   @Test
-  void deveRetornarErroQuandoDetalhesForemNull() {
+  void deveLancarExcecaoQuandoDetalhesForemNull() {
     when(tmdbClient.buscarDetalhes(1L)).thenReturn(null);
 
-    var result = movieService.buscarPorId(1L);
-
-    assertThat(result.textoFormatado()).contains("Detalhes do filme não encontrados");
+    assertThatThrownBy(() -> movieService.buscarPorId(1L))
+        .isInstanceOf(MovieNotFoundException.class)
+        .hasMessageContaining("Detalhes do filme não encontrados");
   }
 
   @Test
@@ -100,12 +102,12 @@ class MovieServiceTest {
   }
 
   @Test
-  void deveRetornarQuandoListaVazia() {
+  void deveLancarExcecaoQuandoListaVazia() {
     when(tmdbClient.pesquisarFilme("x")).thenReturn(new MovieSearchResponse(1, 1, 1, List.of()));
 
-    var response = movieService.executarBuscaFormatada("x");
-
-    assertThat(response.textoFormatado()).contains("Filme não encontrado");
+    assertThatThrownBy(() -> movieService.executarBuscaFormatada("x"))
+        .isInstanceOf(MovieNotFoundException.class)
+        .hasMessageContaining("Filme não encontrado");
   }
 
   @Test
@@ -124,7 +126,7 @@ class MovieServiceTest {
   }
 
   @Test
-  void deveIgnorarPaisInvalido() {
+  void deveUsarGloboQuandoPaisInvalido() {
     var movie = new MovieRecord(1L, "Teste", "2020", "desc", 1.0, 1.0, "/img", List.of("XXX"));
 
     when(tmdbClient.buscarDetalhes(1L)).thenReturn(movie);

@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import lombok.extern.slf4j.Slf4j;
 import net.ddns.adambravo79.tmill.client.TmdbClient;
+import net.ddns.adambravo79.tmill.exception.MovieNotFoundException;
 import net.ddns.adambravo79.tmill.model.MovieOrchestrationResponse;
 import net.ddns.adambravo79.tmill.model.MovieSearchResponse;
 
@@ -23,22 +24,18 @@ public class MovieService {
 
   /** Agora retorna o objeto de busca unificado. */
   public MovieSearchResponse buscarFilme(String nome) {
-    return tmdbClient.pesquisarFilme(nome);
+    var busca = tmdbClient.pesquisarFilme(nome);
+    if (busca == null || busca.results() == null || busca.results().isEmpty()) {
+      throw new MovieNotFoundException("Filme não encontrado: " + nome);
+    }
+    return busca;
   }
 
   /** Executa a busca formatada aplicando a lógica de desambiguação automática. */
   public MovieOrchestrationResponse executarBuscaFormatada(String nome) {
-    // Chamando o método unificado que já aplica os ATALHOS (Gambi do Duna)
-    var busca = tmdbClient.pesquisarFilme(nome);
+    var busca = buscarFilme(nome); // ✅ já lança exceção se não encontrar
 
-    if (busca == null || busca.results() == null || busca.results().isEmpty()) {
-      return new MovieOrchestrationResponse("❌ Filme não encontrado.", null);
-    }
-
-    // Se o usuário digitou exatamente o nome (ou o atalho injetou o nome exato)
-    // pegamos o primeiro resultado da lista.
     var basico = busca.results().get(0);
-
     return buscarPorId(basico.id());
   }
 
@@ -46,7 +43,7 @@ public class MovieService {
   public MovieOrchestrationResponse buscarPorId(long id) {
     var detalhes = tmdbClient.buscarDetalhes(id);
     if (detalhes == null) {
-      return new MovieOrchestrationResponse("❌ Detalhes do filme não encontrados.", null);
+      throw new MovieNotFoundException("Detalhes do filme não encontrados para ID: " + id);
     }
 
     var elenco =
@@ -76,16 +73,16 @@ public class MovieService {
     String texto =
         String.format(
             """
-        🎬 *%s*
-        📅 Ano: %s %s
-        ⭐ *Nota:* [%.1f/10](%s)
+            🎬 *%s*
+            📅 Ano: %s %s
+            ⭐ *Nota:* [%.1f/10](%s)
 
-        📺 *Onde assistir:* %s
+            📺 *Onde assistir:* %s
 
-        👥 *Elenco:* %s
+            👥 *Elenco:* %s
 
-        📖 *Sinopse:* %s
-        """,
+            📖 *Sinopse:* %s
+            """,
             detalhes.title().toUpperCase(),
             ano,
             bandeiras,
