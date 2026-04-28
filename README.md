@@ -1,10 +1,6 @@
 # 🎬 Tmill Bot
 
-<p align="center">
-  <b>Bot inteligente para Telegram que busca filmes no TMDB e transcreve áudios com IA</b>
-</p>
-
-<p align="center">
+Bot inteligente para Telegram que busca filmes no TMDB e transcreve áudios com IA
 
 ![Java](https://img.shields.io/badge/Java-21-orange)
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.x-brightgreen)
@@ -12,9 +8,7 @@
 ![Tests](https://img.shields.io/badge/tests-coming_soon-yellow)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Status](https://img.shields.io/badge/status-v1.0.0-blueviolet)
-![CI](https://github.com/SEU_USER/SEU_REPO/actions/workflows/ci.yml/badge.svg)
-
-</p>
+![CI](https://github.com/andre-s-nascimento/t1000/actions/workflows/ci.yml/badge.svg)
 
 ---
 
@@ -22,9 +16,9 @@
 
 O **Tmill Bot** é um bot para Telegram que combina:
 
-- 🎥 Busca de filmes via API do TMDB  
-- 🎙️ Transcrição de áudio com IA via Groq  
-- 🧠 Refinamento de texto com modelos LLM  
+- 🎥 Busca de filmes via API do TMDB
+- 🎙️ Transcrição de áudio com IA via Groq
+- 🧠 Refinamento de texto com modelos LLM
 - ⚙️ Backend moderno com Spring Boot + Java 21 (Virtual Threads)
 
 ---
@@ -32,6 +26,7 @@ O **Tmill Bot** é um bot para Telegram que combina:
 ## ✨ Funcionalidades
 
 ### 🔎 Busca de Filmes
+
 - Buscar filmes por nome
 - Exibir detalhes:
   - título
@@ -41,6 +36,7 @@ O **Tmill Bot** é um bot para Telegram que combina:
   - onde assistir
 
 ### 🎧 Transcrição de Áudio
+
 - Recebe áudio via Telegram
 - Converte com FFmpeg
 - Transcreve com IA
@@ -51,6 +47,9 @@ O **Tmill Bot** é um bot para Telegram que combina:
 ## 🧠 Arquitetura
 
 Telegram → Controller → Services → Clients → APIs externas
+
+📌 Documentação detalhada da arquitetura está disponível em:  
+[🏗️ Arquitetura de Pacotes](./docs/dev-guide/arquitetura.md)
 
 ---
 
@@ -89,34 +88,48 @@ GROQ_API_KEY=sua_chave
 ./gradlew bootRun
 ```
 
----
-
 ## 🗺️ Roadmap
 
-- [ ] v1.1.0 — Stability & Hardening  
-- [ ] v1.2.0 — Performance & Testing  
-- [ ] v1.3.0 — UX Improvements  
-- [ ] v1.4.0 — DevOps  
-- [ ] v2.0.0 — Scalability  
-
----
+- [ ] v1.1.0 — Stability & Hardening
+- [ ] v1.2.0 — Performance & Testing
+- [ ] v1.3.0 — UX Improvements
+- [ ] v1.4.0 — DevOps
+- [ ] v2.0.0 — Scalability
 
 ## 📦 Estrutura
 
+```bash
 src/main/java
-├── controller
-├── service
+├── cache
 ├── client
 ├── config
-└── util
+├── controller
+├── dto
+├── exception
+├── model
+├── service
+└── telegram
+    ├── core
+    ├── exception
+    └── util
+```
 
----
+## 📚 Documentação de Desenvolvimento
+
+Toda a documentação técnica e guias estão centralizados em:  
+[Dev Guide](./docs/dev-guide/README.md)
+
+Inclui:
+
+- Guia de Logging Estruturado
+- Guia de Arquitetura de Pacotes
+- Guia de Rebase, PRs e Proteção da Branch Develop
+- Configuração do Spotless
+- Reversão Segura na Branch Develop
 
 ## 📄 Licença
 
 MIT
-
----
 
 ## 👨‍💻 Autor
 
