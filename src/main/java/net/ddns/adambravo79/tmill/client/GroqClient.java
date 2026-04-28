@@ -38,7 +38,7 @@ public class GroqClient {
     }
 
     public String transcrever(File wavFile) {
-        log.info("Iniciando transcrição via Groq (Whisper) para o arquivo: {}", wavFile.getName());
+        log.info("🎙️ Iniciando transcrição via Groq (Whisper) para arquivo={}", wavFile.getName());
 
         MultipartBodyBuilder builder = new MultipartBodyBuilder();
         builder.part("file", new org.springframework.core.io.FileSystemResource(wavFile));
@@ -54,19 +54,26 @@ public class GroqClient {
                         .body(TranscriptionResponse.class);
 
         if (response == null || response.text() == null) {
-            log.error("Groq: resposta inválida na transcrição");
+            log.error("❌ Groq: resposta inválida na transcrição arquivo={}", wavFile.getName());
             throw new IllegalStateException("Falha na transcrição — resposta inválida");
         }
 
+        log.info(
+                "✅ Transcrição concluída arquivo={} textoSize={}",
+                wavFile.getName(),
+                response.text().length());
         return response.text();
     }
 
     public String refinarTexto(String textoBruto) {
         if (textoBruto.length() > 5000) {
+            log.warn(
+                    "⚠️ Texto muito longo para refinamento automático size={}",
+                    textoBruto.length());
             throw new IllegalArgumentException("Texto muito longo para refinamento automático");
         }
 
-        log.debug("Refinando texto via Llama 3.1");
+        log.debug("✨ Refinando texto via Llama 3.1 size={}", textoBruto.length());
 
         var payload =
                 Map.of(
@@ -94,10 +101,15 @@ public class GroqClient {
                         .body(ChatCompletionResponse.class);
 
         if (response == null || response.choices().isEmpty()) {
-            log.error("Groq: resposta inválida no refinamento");
+            log.error("❌ Groq: resposta inválida no refinamento textoSize={}", textoBruto.length());
             throw new IllegalStateException("Falha no refinamento — resposta inválida");
         }
 
-        return response.choices().get(0).message().content();
+        String textoRefinado = response.choices().get(0).message().content();
+        log.info(
+                "✅ Refinamento concluído textoSize={} refinadoSize={}",
+                textoBruto.length(),
+                textoRefinado.length());
+        return textoRefinado;
     }
 }
