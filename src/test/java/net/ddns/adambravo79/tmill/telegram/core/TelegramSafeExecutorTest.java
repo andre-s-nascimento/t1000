@@ -1,5 +1,5 @@
 /* (c) 2026 | 27/04/2026 */
-package net.ddns.adambravo79.tmill.telegram;
+package net.ddns.adambravo79.tmill.telegram.core;
 
 import static org.mockito.Mockito.*;
 

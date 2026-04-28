@@ -1,5 +1,5 @@
 /* (c) 2026 | 27/04/2026 */
-package net.ddns.adambravo79.tmill.service;
+package net.ddns.adambravo79.tmill.cache;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

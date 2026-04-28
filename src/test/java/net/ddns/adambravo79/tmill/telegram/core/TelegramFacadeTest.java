@@ -1,5 +1,5 @@
 /* (c) 2026 | 27/04/2026 */
-package net.ddns.adambravo79.tmill.telegram;
+package net.ddns.adambravo79.tmill.telegram.core;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -19,6 +19,11 @@ import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
+
+import net.ddns.adambravo79.tmill.telegram.exception.TelegramExceptionHandler;
+import net.ddns.adambravo79.tmill.telegram.exception.TelegramFileException;
+import net.ddns.adambravo79.tmill.telegram.util.MetricsService;
+import net.ddns.adambravo79.tmill.telegram.util.RetryPolicy;
 
 class TelegramFacadeTest {
 
