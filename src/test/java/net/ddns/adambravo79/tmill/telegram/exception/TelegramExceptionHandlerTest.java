@@ -1,10 +1,12 @@
 /* (c) 2026 | 27/04/2026 */
-package net.ddns.adambravo79.tmill.telegram;
+package net.ddns.adambravo79.tmill.telegram.exception;
 
 import static org.mockito.Mockito.*;
 
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+
+import net.ddns.adambravo79.tmill.telegram.core.TelegramSender;
 
 class TelegramExceptionHandlerTest {
 
