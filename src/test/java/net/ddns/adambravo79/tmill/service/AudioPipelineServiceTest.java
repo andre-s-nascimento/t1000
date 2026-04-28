@@ -14,6 +14,7 @@ import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import net.ddns.adambravo79.tmill.cache.TranscricaoCache;
 import net.ddns.adambravo79.tmill.client.GroqClient;
 import net.ddns.adambravo79.tmill.exception.AudioProcessingException;
 

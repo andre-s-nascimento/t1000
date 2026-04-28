@@ -1,5 +1,5 @@
 /* (c) 2026 | 27/04/2026 */
-package net.ddns.adambravo79.tmill.telegram;
+package net.ddns.adambravo79.tmill.telegram.core;
 
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
@@ -17,10 +17,10 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
  */
 @FunctionalInterface
 public interface TelegramAction {
-  /**
-   * Executa a ação definida.
-   *
-   * @throws TelegramApiException se ocorrer falha na chamada à API do Telegram.
-   */
-  void run() throws TelegramApiException;
+    /**
+     * Executa a ação definida.
+     *
+     * @throws TelegramApiException se ocorrer falha na chamada à API do Telegram.
+     */
+    void run() throws TelegramApiException;
 }

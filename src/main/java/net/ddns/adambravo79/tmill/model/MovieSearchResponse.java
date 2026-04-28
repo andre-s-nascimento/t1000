@@ -1,8 +1,9 @@
 /* (c) 2026 | 27/04/2026 */
 package net.ddns.adambravo79.tmill.model;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * DTO que representa a resposta de busca de filmes na API do TMDB com suporte a paginação.
@@ -14,7 +15,7 @@ import java.util.List;
  * <p>Usado para mapear o endpoint `/search/movie` da API do TMDB.
  */
 public record MovieSearchResponse(
-    int page,
-    @JsonProperty("total_results") int totalResults,
-    @JsonProperty("total_pages") int totalPages,
-    List<MovieRecord> results) {}
+        int page,
+        @JsonProperty("total_results") int totalResults,
+        @JsonProperty("total_pages") int totalPages,
+        List<MovieRecord> results) {}
