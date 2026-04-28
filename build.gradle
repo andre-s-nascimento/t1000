@@ -106,7 +106,7 @@ spotless {
         endWithNewline()
 
         // evita bagunça de licença
-        licenseHeader '/* (c) $YEAR */'
+        //licenseHeader '/* (c) $YEAR */'
     }
 }
 

@@ -1,4 +1,4 @@
-/* (c) 2026-2026 */
+/* (c) 2026 | 27/04/2026 */
 package net.ddns.adambravo79.tmill.exception;
 
 /** Exceção lançada quando ocorre falha ao publicar ou criar rascunho no Blogger. */
