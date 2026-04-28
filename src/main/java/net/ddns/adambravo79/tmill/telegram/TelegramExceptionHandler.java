@@ -1,4 +1,4 @@
-/* (c) 2026-2026 */
+/* (c) 2026 | 27/04/2026 */
 package net.ddns.adambravo79.tmill.telegram;
 
 import java.io.IOException;
