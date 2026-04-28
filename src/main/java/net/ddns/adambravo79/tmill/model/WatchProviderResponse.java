@@ -1,9 +1,10 @@
 /* (c) 2026 | 27/04/2026 */
 package net.ddns.adambravo79.tmill.model;
 
+import java.util.Map;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import java.util.Map;
 
 /**
  * DTO que representa os provedores de streaming disponíveis para um filme, organizados por país.
@@ -15,4 +16,4 @@ import java.util.Map;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record WatchProviderResponse(
-    @JsonProperty("results") Map<String, CountryProviders> results) {}
+        @JsonProperty("results") Map<String, CountryProviders> results) {}

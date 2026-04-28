@@ -9,29 +9,29 @@ package net.ddns.adambravo79.tmill.exception;
  */
 public class MovieNotFoundException extends RuntimeException {
 
-  private final String contexto;
+    private final String contexto;
 
-  public MovieNotFoundException(String message) {
-    super(message);
-    this.contexto = null;
-  }
+    public MovieNotFoundException(String message) {
+        super(message);
+        this.contexto = null;
+    }
 
-  public MovieNotFoundException(String message, Throwable cause) {
-    super(message, cause);
-    this.contexto = null;
-  }
+    public MovieNotFoundException(String message, Throwable cause) {
+        super(message, cause);
+        this.contexto = null;
+    }
 
-  public MovieNotFoundException(String message, String contexto, Throwable cause) {
-    super(message, cause);
-    this.contexto = contexto;
-  }
+    public MovieNotFoundException(String message, String contexto, Throwable cause) {
+        super(message, cause);
+        this.contexto = contexto;
+    }
 
-  public String getContexto() {
-    return contexto;
-  }
+    public String getContexto() {
+        return contexto;
+    }
 
-  @Override
-  public String toString() {
-    return "MovieNotFoundException{message=" + getMessage() + ", contexto=" + contexto + "}";
-  }
+    @Override
+    public String toString() {
+        return "MovieNotFoundException{message=" + getMessage() + ", contexto=" + contexto + "}";
+    }
 }

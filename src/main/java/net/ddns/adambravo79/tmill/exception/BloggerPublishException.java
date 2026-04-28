@@ -9,29 +9,29 @@ package net.ddns.adambravo79.tmill.exception;
  */
 public class BloggerPublishException extends RuntimeException {
 
-  private final String contexto;
+    private final String contexto;
 
-  public BloggerPublishException(String message) {
-    super(message);
-    this.contexto = null;
-  }
+    public BloggerPublishException(String message) {
+        super(message);
+        this.contexto = null;
+    }
 
-  public BloggerPublishException(String message, Throwable cause) {
-    super(message, cause);
-    this.contexto = null;
-  }
+    public BloggerPublishException(String message, Throwable cause) {
+        super(message, cause);
+        this.contexto = null;
+    }
 
-  public BloggerPublishException(String message, String contexto, Throwable cause) {
-    super(message, cause);
-    this.contexto = contexto;
-  }
+    public BloggerPublishException(String message, String contexto, Throwable cause) {
+        super(message, cause);
+        this.contexto = contexto;
+    }
 
-  public String getContexto() {
-    return contexto;
-  }
+    public String getContexto() {
+        return contexto;
+    }
 
-  @Override
-  public String toString() {
-    return "BloggerPublishException{message=" + getMessage() + ", contexto=" + contexto + "}";
-  }
+    @Override
+    public String toString() {
+        return "BloggerPublishException{message=" + getMessage() + ", contexto=" + contexto + "}";
+    }
 }
