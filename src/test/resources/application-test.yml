@@ -12,4 +12,4 @@ bot:
 
 telegram:
   bot:
-    enabled: false # Desativa o polling no ambiente de teste  
+    enabled: false # Desativa o polling no ambiente de teste

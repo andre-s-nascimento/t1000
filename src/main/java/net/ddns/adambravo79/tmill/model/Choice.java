@@ -1,8 +1,14 @@
-/* (c) 2026 */
+/* (c) 2026 | 27/04/2026 */
 package net.ddns.adambravo79.tmill.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
-/** Choice precisa ser public para ser usada no record public principal. */
+/**
+ * DTO que representa uma opção retornada pelo modelo de chat.
+ *
+ * <p>Campos: - message: mensagem associada à opção (conteúdo gerado pelo modelo).
+ *
+ * <p>Usado dentro de {@link ChatCompletionResponse} para mapear a lista de respostas possíveis.
+ */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record Choice(Message message) {}
