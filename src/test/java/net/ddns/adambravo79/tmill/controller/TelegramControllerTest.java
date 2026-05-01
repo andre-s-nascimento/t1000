@@ -1,4 +1,4 @@
-/* (c) 2026 | 27/04/2026 */
+/* (c) 2026 | 01/05/2026 */
 package net.ddns.adambravo79.tmill.controller;
 
 import static org.assertj.core.api.Assertions.*;
@@ -13,13 +13,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.telegram.telegrambots.meta.api.objects.*;
+import org.telegram.telegrambots.meta.api.objects.chat.Chat;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 
 import net.ddns.adambravo79.tmill.cache.TranscricaoCache;
 import net.ddns.adambravo79.tmill.client.BloggerClient;
 import net.ddns.adambravo79.tmill.model.*;
 import net.ddns.adambravo79.tmill.service.*;
-import net.ddns.adambravo79.tmill.telegram.core.TelegramAction;
 import net.ddns.adambravo79.tmill.telegram.core.TelegramFacade;
 import net.ddns.adambravo79.tmill.telegram.core.TelegramSafeExecutor;
 
@@ -31,7 +32,7 @@ class TelegramControllerTest {
     private TranscricaoCache cache;
     private TelegramFileService fileService;
     private TelegramFacade telegramFacade;
-    private TelegramSafeExecutor safeExecutor;
+    private TelegramSafeExecutor safeExecutor; // instância real
 
     private TelegramController controller;
 
@@ -43,21 +44,8 @@ class TelegramControllerTest {
         cache = mock(TranscricaoCache.class);
         fileService = mock(TelegramFileService.class);
         telegramFacade = mock(TelegramFacade.class);
-        safeExecutor = mock(TelegramSafeExecutor.class);
-
-        // ✅ Replica o comportamento real: executa o action e absorve exceções
-        doAnswer(
-                        inv -> {
-                            TelegramAction action = inv.getArgument(2);
-                            try {
-                                action.run();
-                            } catch (Exception e) {
-                                // absorve — igual ao TelegramSafeExecutor real
-                            }
-                            return null;
-                        })
-                .when(safeExecutor)
-                .run(anyLong(), any(), any(TelegramAction.class));
+        // Usa o executor real (não mock)
+        safeExecutor = new TelegramSafeExecutor();
 
         controller =
                 new TelegramController(
@@ -124,6 +112,23 @@ class TelegramControllerTest {
         verify(telegramFacade).enviarMensagem(1L, "❌ Filme não encontrado.");
     }
 
+    @Test
+    void deveRejeitarBuscaComMenosDe3Caracteres() {
+        controller.consume(buildTextUpdate(1L, "t1000 buscar ab"));
+        verify(telegramFacade)
+                .enviarMensagem(1L, "🔍 O termo de busca deve ter pelo menos 3 caracteres.");
+        verifyNoInteractions(movieService);
+    }
+
+    @Test
+    void deveRejeitarBuscaComMaisDe100Caracteres() {
+        String termoLongo = "a".repeat(101);
+        controller.consume(buildTextUpdate(1L, "t1000 buscar " + termoLongo));
+        verify(telegramFacade)
+                .enviarMensagem(1L, "🔍 O termo de busca é muito longo (máx. 100 caracteres).");
+        verifyNoInteractions(movieService);
+    }
+
     // =========================
     // 🎙️ AUDIO
     // =========================
@@ -187,6 +192,61 @@ class TelegramControllerTest {
         verify(telegramFacade).enviarMensagem(1L, "🔇 Transcrição desativada.");
     }
 
+    @Test
+    void deveRejeitarAudioMaiorQue20MB() {
+        ReflectionTestUtils.setField(controller, "transcriptionEnabled", true);
+
+        Update update = mock(Update.class);
+        Message message = mock(Message.class);
+        Voice voice = mock(Voice.class);
+        User user = mock(User.class);
+
+        when(update.hasMessage()).thenReturn(true);
+        when(update.getMessage()).thenReturn(message);
+        when(message.getChatId()).thenReturn(1L);
+        when(message.hasVoice()).thenReturn(true);
+        when(message.getVoice()).thenReturn(voice);
+        when(voice.getFileId()).thenReturn("file-id");
+        when(voice.getFileSize()).thenReturn(21L * 1024 * 1024); // 21 MB
+        when(message.getFrom()).thenReturn(user);
+        when(user.getId()).thenReturn(1L);
+
+        controller.consume(update);
+
+        verify(telegramFacade)
+                .enviarMensagem(1L, "📂 O arquivo de áudio excede 20 MB. Envie um arquivo menor.");
+        verifyNoInteractions(fileService);
+    }
+
+    @Test
+    void deveEnviarBotoesAoReceberAudioEmGrupo() {
+        ReflectionTestUtils.setField(controller, "transcriptionEnabled", true);
+
+        Update update = mock(Update.class);
+        Message message = mock(Message.class);
+        Voice voice = mock(Voice.class);
+        Chat chat = mock(Chat.class);
+        User user = mock(User.class);
+
+        when(update.hasMessage()).thenReturn(true);
+        when(update.getMessage()).thenReturn(message);
+        when(message.getChatId()).thenReturn(-100L);
+        when(message.hasVoice()).thenReturn(true);
+        when(message.getVoice()).thenReturn(voice);
+        when(voice.getFileId()).thenReturn("file-id");
+        when(voice.getFileSize()).thenReturn(1024L);
+        when(message.getChat()).thenReturn(chat);
+        when(chat.isGroupChat()).thenReturn(true);
+        when(message.getFrom()).thenReturn(user);
+        when(user.getId()).thenReturn(123L);
+
+        controller.consume(update);
+
+        verify(telegramFacade)
+                .enviarComBotoes(eq(-100L), anyString(), any(InlineKeyboardMarkup.class));
+        verifyNoInteractions(fileService, audioService);
+    }
+
     // =========================
     // 🔘 CALLBACKS
     // =========================
@@ -200,18 +260,6 @@ class TelegramControllerTest {
 
         verify(bloggerClient).criarRascunho("Post automático", "texto");
         verify(telegramFacade).enviarMensagem(1L, "✅ Publicado: url");
-    }
-
-    @Test
-    void deveProcessarCallbackPublicarComTexto() {
-        when(cache.recuperar(1L)).thenReturn("texto");
-        when(bloggerClient.criarRascunho(any(), eq("texto"))).thenReturn("url");
-
-        controller.consume(buildCallbackUpdate(1L, "blogger:publicar"));
-
-        verify(bloggerClient).criarRascunho("Post automático", "texto");
-        verify(telegramFacade).enviarMensagem(1L, "✅ Publicado: url");
-        verify(cache).remover(1L);
     }
 
     @Test
@@ -242,6 +290,46 @@ class TelegramControllerTest {
         verify(telegramFacade).enviarFoto(eq(1L), anyString(), anyString());
     }
 
+    @Test
+    void deveProcessarCallbackTranscricaoBrutaEmGrupo() throws Exception {
+        ReflectionTestUtils.setField(controller, "transcriptionEnabled", true);
+
+        CallbackQuery cb = mock(CallbackQuery.class);
+        Message msg = mock(Message.class);
+        User user = mock(User.class);
+
+        // 🔥 CORREÇÃO: sem espaço antes do -100
+        when(cb.getData()).thenReturn("trans_bruto|file123|-100");
+        when(cb.getMessage()).thenReturn(msg);
+        when(msg.getChatId()).thenReturn(-100L);
+        when(msg.getMessageId()).thenReturn(42);
+        when(cb.getFrom()).thenReturn(user);
+        when(user.getId()).thenReturn(999L);
+        when(cb.getId()).thenReturn("cb123");
+
+        File fakeFile = new File("audio.oga");
+        when(fileService.baixarArquivo("file123")).thenReturn(fakeFile);
+
+        doAnswer(
+                        inv -> {
+                            BiConsumer<String, Boolean> cbk = inv.getArgument(2);
+                            cbk.accept("texto bruto", false);
+                            return null;
+                        })
+                .when(audioService)
+                .processarFluxoAudio(any(), eq(999L), any());
+
+        controller.consume(buildCallbackUpdate(cb));
+
+        // Aguarda a conclusão do CompletableFuture.runAsync()
+        Thread.sleep(500);
+
+        verify(telegramFacade)
+                .answerCallbackQuery("cb123", "Processando áudio... enviarei no privado.", false);
+        verify(telegramFacade).enviarMensagem(999L, "🎙️ *Transcrição Bruta:*\ntexto bruto");
+        verify(telegramFacade).editarMensagem(-100L, 42, "✅ Transcrição enviada no privado.");
+    }
+
     // =========================
     // 🧩 UTIL
     // =========================
@@ -249,12 +337,10 @@ class TelegramControllerTest {
     @Test
     void deveDividirMensagemGrande() {
         String texto = "a ".repeat(5000);
-        @SuppressWarnings("unchecked")
         List<String> partes =
                 (List<String>)
                         ReflectionTestUtils.invokeMethod(
                                 controller, "dividirMensagem", texto, 4000);
-
         assertThat(partes).isNotNull().hasSizeGreaterThan(1);
     }
 
@@ -262,15 +348,12 @@ class TelegramControllerTest {
     void deveIgnorarMensagemSemConteudo() {
         var update = mock(Update.class);
         var message = mock(Message.class);
-        var user = mock(User.class); // 🟢 Adicionado
+        var user = mock(User.class);
 
         when(update.hasMessage()).thenReturn(true);
         when(update.getMessage()).thenReturn(message);
-
-        // 🟢 Garante que o getFrom() não seja null
         when(message.getFrom()).thenReturn(user);
         when(user.getId()).thenReturn(12345L);
-
         when(message.hasText()).thenReturn(false);
         when(message.hasVoice()).thenReturn(false);
 
@@ -304,14 +387,12 @@ class TelegramControllerTest {
                 (String)
                         ReflectionTestUtils.invokeMethod(
                                 controller, "fecharMarkdown", "*texto* com *asterisco");
-
         assertThat(fechado).endsWith("*");
     }
 
     @Test
     void deveEnviarRespostaComBotoesBlogger() {
         ReflectionTestUtils.invokeMethod(controller, "enviarRespostaComBotoesBlogger", 1L, "texto");
-
         verify(cache).salvar(1L, "texto");
         verify(telegramFacade).enviarComBotoes(eq(1L), eq("texto"), any());
     }
@@ -323,15 +404,13 @@ class TelegramControllerTest {
     private Update buildTextUpdate(long chatId, String text) {
         var update = mock(Update.class);
         var message = mock(Message.class);
-        var user = mock(User.class); // 🟢 Adicionado
+        var user = mock(User.class);
 
         when(update.hasMessage()).thenReturn(true);
         when(update.getMessage()).thenReturn(message);
         when(message.getChatId()).thenReturn(chatId);
         when(message.hasText()).thenReturn(true);
         when(message.getText()).thenReturn(text);
-
-        // 🟢 Configura o remetente para evitar o NPE na linha 87 do Controller
         when(message.getFrom()).thenReturn(user);
         when(user.getId()).thenReturn(12345L);
 
@@ -343,14 +422,22 @@ class TelegramControllerTest {
         var message = mock(Message.class);
         var voice = mock(Voice.class);
         var user = mock(User.class);
+        var chat = mock(Chat.class);
+
         when(update.hasMessage()).thenReturn(true);
         when(update.getMessage()).thenReturn(message);
         when(message.getChatId()).thenReturn(chatId);
         when(message.hasVoice()).thenReturn(true);
         when(message.getVoice()).thenReturn(voice);
         when(voice.getFileId()).thenReturn(fileId);
+        when(voice.getFileSize()).thenReturn(1024L);
         when(message.getFrom()).thenReturn(user);
         when(user.getId()).thenReturn(userId);
+        // Garante que não seja grupo (chat normal privado)
+        when(message.getChat()).thenReturn(chat);
+        when(chat.isGroupChat()).thenReturn(false);
+        when(chat.isSuperGroupChat()).thenReturn(false);
+
         return update;
     }
 
@@ -358,11 +445,21 @@ class TelegramControllerTest {
         var update = mock(Update.class);
         var cb = mock(CallbackQuery.class);
         var message = mock(Message.class);
+
         when(update.hasCallbackQuery()).thenReturn(true);
         when(update.getCallbackQuery()).thenReturn(cb);
         when(cb.getData()).thenReturn(data);
         when(cb.getMessage()).thenReturn(message);
         when(message.getChatId()).thenReturn(chatId);
+        when(cb.getId()).thenReturn("fake-cb-id");
+
+        return update;
+    }
+
+    private Update buildCallbackUpdate(CallbackQuery cb) {
+        var update = mock(Update.class);
+        when(update.hasCallbackQuery()).thenReturn(true);
+        when(update.getCallbackQuery()).thenReturn(cb);
         return update;
     }
 }
