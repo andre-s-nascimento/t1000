@@ -1,8 +1,9 @@
-/* (c) 2026 | 27/04/2026 */
+/* (c) 2026 | 01/05/2026 */
 package net.ddns.adambravo79.tmill.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
@@ -28,6 +29,7 @@ class MovieServiceTest {
 
     @Test
     void deveLancarExcecaoQuandoFilmeNaoEncontrado() {
+        // Usa um termo com 3+ caracteres para passar na validação de tamanho
         when(tmdbClient.pesquisarFilme("xyz")).thenReturn(null);
 
         assertThatThrownBy(() -> movieService.executarBuscaFormatada("xyz"))
@@ -111,10 +113,11 @@ class MovieServiceTest {
 
     @Test
     void deveLancarExcecaoQuandoListaVazia() {
-        when(tmdbClient.pesquisarFilme("x"))
-                .thenReturn(new MovieSearchResponse(1, 1, 1, List.of()));
+        // Termo com 3 caracteres que retorna lista vazia
+        when(tmdbClient.pesquisarFilme("xyz"))
+                .thenReturn(new MovieSearchResponse(1, 0, 0, List.of()));
 
-        assertThatThrownBy(() -> movieService.executarBuscaFormatada("x"))
+        assertThatThrownBy(() -> movieService.executarBuscaFormatada("xyz"))
                 .isInstanceOf(MovieNotFoundException.class)
                 .hasMessageContaining("Filme não encontrado");
     }
@@ -145,5 +148,39 @@ class MovieServiceTest {
         var result = movieService.buscarPorId(1L);
 
         assertThat(result.textoFormatado()).contains("🌐");
+    }
+
+    // NOVO: teste de validação de tamanho da busca
+    @Test
+    void deveLancarExcecaoQuandoBuscaMuitoCurta() {
+        assertThatThrownBy(() -> movieService.buscarFilme("ab"))
+                .isInstanceOf(MovieNotFoundException.class)
+                .hasMessageContaining("Termo de busca muito curto");
+    }
+
+    @Test
+    void deveLancarExcecaoQuandoBuscaMuitoLonga() {
+        String termoLongo = "a".repeat(101);
+        assertThatThrownBy(() -> movieService.buscarFilme(termoLongo))
+                .isInstanceOf(MovieNotFoundException.class)
+                .hasMessageContaining("Termo de busca muito longo");
+    }
+
+    @Test
+    void deveSanitizarCaracteresEspeciais() {
+        // A sanitização remove apenas caracteres não-alfanuméricos, mantendo acentos
+        when(tmdbClient.pesquisarFilme("válidotermo"))
+                .thenReturn(
+                        new MovieSearchResponse(
+                                1,
+                                1,
+                                1,
+                                List.of(
+                                        new MovieRecord(
+                                                1L, "Filme", "2020", "", 1.0, 1.0, "",
+                                                List.of()))));
+
+        movieService.buscarFilme("válido@termo#"); // deve ser sanitizado para "válidotermo"
+        verify(tmdbClient).pesquisarFilme("válidotermo");
     }
 }

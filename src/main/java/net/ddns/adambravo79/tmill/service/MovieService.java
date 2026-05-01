@@ -1,4 +1,4 @@
-/* (c) 2026 | 27/04/2026 */
+/* (c) 2026 | 01/05/2026 */
 package net.ddns.adambravo79.tmill.service;
 
 import java.util.Optional;
@@ -36,7 +36,16 @@ public class MovieService {
      * @throws MovieNotFoundException se nenhum resultado for encontrado.
      */
     public MovieSearchResponse buscarFilme(String nome) {
-        var busca = tmdbClient.pesquisarFilme(nome);
+        // NOVO: sanitização básica
+        String sanitized = nome.trim().replaceAll("[^\\p{L}\\p{N}\\s]", "");
+        if (sanitized.length() < 3) {
+            throw new MovieNotFoundException("Termo de busca muito curto: " + nome);
+        }
+        if (sanitized.length() > 100) {
+            throw new MovieNotFoundException("Termo de busca muito longo: " + nome);
+        }
+
+        var busca = tmdbClient.pesquisarFilme(sanitized);
         if (busca == null || busca.results() == null || busca.results().isEmpty()) {
             throw new MovieNotFoundException("Filme não encontrado: " + nome);
         }

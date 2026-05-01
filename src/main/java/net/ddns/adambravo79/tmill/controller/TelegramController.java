@@ -1,9 +1,12 @@
-/* (c) 2026 | 27/04/2026 */
+/* (c) 2026 | 01/05/2026 */
 package net.ddns.adambravo79.tmill.controller;
 
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -43,6 +46,12 @@ public class TelegramController implements LongPollingUpdateConsumer {
     private long ownerId;
 
     private static final int TELEGRAM_LIMIT = 4000;
+
+    // NOVO: limite máximo de tamanho de áudio (20 MB)
+    private static final long MAX_AUDIO_SIZE_BYTES = 20 * 1024 * 1024; // 20 MB
+
+    // NOVO: cache para evitar processamento duplicado do mesmo áudio em grupos
+    private final Set<String> processedGroupAudios = ConcurrentHashMap.newKeySet();
 
     // =========================
     // 🚀 ENTRYPOINT
@@ -118,12 +127,32 @@ public class TelegramController implements LongPollingUpdateConsumer {
     // =========================
 
     private void tratarTexto(Message message, long chatId) {
-        String texto = message.getText().toLowerCase();
+        String texto = message.getText().toLowerCase().trim();
         log.debug("🔎 Processando texto chatId={} texto='{}'", chatId, texto);
 
+        // NOVO: suporte ao comando /start
+        if (texto.equals("/start")) {
+            enviarBoasVindas(chatId, message.getFrom().getFirstName());
+            return;
+        }
+
+        // Comando existente: buscar filmes
         if (!texto.startsWith("t1000 buscar")) return;
 
         String nome = texto.replace("t1000 buscar", "").trim();
+
+        // NOVO: validação da busca (mínimo 3, máximo 100 caracteres)
+        if (nome.length() < 3) {
+            telegramFacade.enviarMensagem(
+                    chatId, "🔍 O termo de busca deve ter pelo menos 3 caracteres.");
+            return;
+        }
+        if (nome.length() > 100) {
+            telegramFacade.enviarMensagem(
+                    chatId, "🔍 O termo de busca é muito longo (máx. 100 caracteres).");
+            return;
+        }
+
         var busca = movieService.buscarFilme(nome);
 
         if (busca == null || busca.results() == null || busca.results().isEmpty()) {
@@ -147,6 +176,26 @@ public class TelegramController implements LongPollingUpdateConsumer {
         enviarOpcoesDesambiguacao(chatId, busca.results());
     }
 
+    // NOVO: mensagem de boas-vindas com /start
+    private void enviarBoasVindas(long chatId, String firstName) {
+        String saudacao =
+                String.format(
+                        """
+            🤖 Olá, %s! Eu sou o **Tmill Bot**, o robô de metal líquido das transcrições e buscas.
+
+            📌 **O que posso fazer?**
+            🎬 Buscar filmes: `t1000 buscar <nome do filme>`
+            🎙️ Transcrever áudios: envie uma mensagem de voz ou áudio.
+
+            💡 **Em grupos/canais:**
+            Ao enviar um áudio, aparecerão botões para você escolher a transcrição **bruta** (🎙️) ou **refinada** (✨). O resultado chegará no seu **chat privado**.
+
+            Desenvolvido com 🧠 e ☕ Java 21 + Spring Boot.
+            """,
+                        firstName);
+        telegramFacade.enviarMensagem(chatId, saudacao);
+    }
+
     // =========================
     // 🎙️ AUDIO
     // =========================
@@ -162,14 +211,38 @@ public class TelegramController implements LongPollingUpdateConsumer {
                 message.hasVoice()
                         ? message.getVoice().getFileId()
                         : message.getAudio().getFileId();
+        long fileSize =
+                message.hasVoice()
+                        ? message.getVoice().getFileSize()
+                        : message.getAudio().getFileSize();
+
+        // NOVO: validação de tamanho do arquivo
+        if (fileSize > MAX_AUDIO_SIZE_BYTES) {
+            log.warn("⚠️ Áudio muito grande chatId={} size={} bytes", chatId, fileSize);
+            telegramFacade.enviarMensagem(
+                    chatId, "📂 O arquivo de áudio excede 20 MB. Envie um arquivo menor.");
+            return;
+        }
+
+        if (fileId == null || fileId.isEmpty()) {
+            log.error("❌ fileId inválido chatId={}", chatId);
+            telegramFacade.enviarMensagem(
+                    chatId, "❌ Identificador do áudio inválido. Tente novamente.");
+            return;
+        }
+
+        boolean isGroup = isGroupChat(message);
+
+        // NOVO: comportamento diferenciado para grupos
+        if (isGroup) {
+            log.info("🎙️ Áudio recebido em grupo chatId={} fileId={}", chatId, fileId);
+            enviarBotoesTranscricaoEmGrupo(chatId, fileId);
+            return;
+        }
+
+        // Comportamento original para chat privado
         long userId = message.getFrom().getId();
         boolean isOwner = userId == ownerId;
-
-        log.info(
-                "🎙️ Iniciando fluxo de áudio chatId={} userId={} fileId={}",
-                chatId,
-                userId,
-                fileId);
 
         File file = fileService.baixarArquivo(fileId);
 
@@ -198,6 +271,38 @@ public class TelegramController implements LongPollingUpdateConsumer {
                 });
     }
 
+    // NOVO: detecta se a mensagem veio de um grupo/supergrupo/canal
+    private boolean isGroupChat(Message message) {
+        var chat = message.getChat();
+        return chat.isGroupChat() || chat.isSuperGroupChat() || chat.isChannelChat();
+    }
+
+    // NOVO: envia botões para transcrição em grupos
+    private void enviarBotoesTranscricaoEmGrupo(long groupId, String fileId) {
+        String brutoData = "trans_bruto|" + fileId + "|" + groupId;
+        String refinadoData = "trans_refinado|" + fileId + "|" + groupId;
+
+        InlineKeyboardMarkup markup =
+                InlineKeyboardMarkup.builder()
+                        .keyboard(
+                                List.of(
+                                        new InlineKeyboardRow(
+                                                InlineKeyboardButton.builder()
+                                                        .text("🎙️ Transcrição Bruta")
+                                                        .callbackData(brutoData)
+                                                        .build(),
+                                                InlineKeyboardButton.builder()
+                                                        .text("✨ Transcrição Refinada")
+                                                        .callbackData(refinadoData)
+                                                        .build())))
+                        .build();
+
+        String mensagem =
+                "🎧 Áudio recebido! Clique num botão abaixo para receber a transcrição no seu chat"
+                        + " privado.";
+        telegramFacade.enviarComBotoes(groupId, mensagem, markup);
+    }
+
     // =========================
     // 🔘 CALLBACK
     // =========================
@@ -206,6 +311,12 @@ public class TelegramController implements LongPollingUpdateConsumer {
         String data = cb.getData();
         long chatId = cb.getMessage().getChatId();
         log.debug("🔘 Tratando callback chatId={} data={}", chatId, data);
+
+        // NOVO: callbacks de transcrição em grupo
+        if (data.startsWith("trans_bruto|") || data.startsWith("trans_refinado|")) {
+            tratarCallbackTranscricao(cb, data);
+            return;
+        }
 
         if (data.startsWith("id:")) {
             long id = Long.parseLong(data.replace("id:", ""));
@@ -242,6 +353,100 @@ public class TelegramController implements LongPollingUpdateConsumer {
                 telegramFacade.enviarMensagem(chatId, "❌ Falha ao publicar.");
             }
         }
+    }
+
+    // NOVO: processa clique nos botões de transcrição dentro de grupos
+    private void tratarCallbackTranscricao(CallbackQuery callback, String data) {
+        String[] parts = data.split("\\|", 3);
+        if (parts.length < 3) {
+            log.error("Callback malformado: {}", data);
+            return;
+        }
+        String tipo = parts[0]; // "trans_bruto" ou "trans_refinado"
+        String fileId = parts[1];
+        long groupId = Long.parseLong(parts[2]);
+        long userId = callback.getFrom().getId();
+        int messageId = callback.getMessage().getMessageId();
+
+        String key = groupId + "_" + fileId;
+        if (processedGroupAudios.contains(key)) {
+            log.info("Áudio já processado no grupo groupId={} fileId={}", groupId, fileId);
+            telegramFacade.answerCallbackQuery(
+                    callback.getId(), "Este áudio já foi transcrito por outro usuário.", true);
+            return;
+        }
+
+        // Marca como processado imediatamente para evitar duplicatas concorrentes
+        processedGroupAudios.add(key);
+
+        // Responde ao clique rapidamente
+        telegramFacade.answerCallbackQuery(
+                callback.getId(), "Processando áudio... enviarei no privado.", false);
+
+        // Processa de forma assíncrona para não bloquear o callback
+        CompletableFuture.runAsync(
+                () -> {
+                    try {
+                        File audioFile = fileService.baixarArquivo(fileId);
+                        final String[] resultado = {null};
+                        final boolean[] refinadoRecebido = {false};
+
+                        audioService.processarFluxoAudio(
+                                audioFile,
+                                userId,
+                                (texto, isUltima) -> {
+                                    if ("trans_bruto".equals(tipo)) {
+                                        // Para bruto, a primeira mensagem (não refinada) é a que
+                                        // interessa
+                                        if (!isUltima) {
+                                            resultado[0] = texto;
+                                        }
+                                    } else {
+                                        // Para refinado, capturamos a última mensagem (refinada)
+                                        if (isUltima) {
+                                            resultado[0] = texto;
+                                            refinadoRecebido[0] = true;
+                                        }
+                                    }
+                                });
+
+                        if (resultado[0] == null) {
+                            throw new IllegalStateException(
+                                    "Nenhum texto foi produzido para o tipo " + tipo);
+                        }
+
+                        // Envia a transcrição para o privado do usuário
+                        String prefixo =
+                                "trans_bruto".equals(tipo)
+                                        ? "🎙️ *Transcrição Bruta:*\n"
+                                        : "✨ *Transcrição Refinada:*\n";
+                        telegramFacade.enviarMensagem(userId, prefixo + resultado[0]);
+
+                        // Edita a mensagem original do grupo removendo os botões
+                        editarMensagemGrupo(
+                                groupId, messageId, "✅ Transcrição enviada no privado.");
+
+                    } catch (Exception e) {
+                        log.error(
+                                "Erro ao processar áudio para grupo groupId={} fileId={}",
+                                groupId,
+                                fileId,
+                                e);
+                        editarMensagemGrupo(
+                                groupId, messageId, "❌ Falha ao processar áudio. Tente novamente.");
+                        // Em caso de falha, não removemos do cache para evitar repetição? Melhor
+                        // manter para
+                        // não spammar.
+                        // Mas poderia remover se quiser dar chance de tentar de novo. Por ora
+                        // mantemos
+                        // bloqueado.
+                    }
+                });
+    }
+
+    // NOVO: edita uma mensagem existente no grupo (remove botões)
+    private void editarMensagemGrupo(long chatId, int messageId, String novoTexto) {
+        telegramFacade.editarMensagem(chatId, messageId, novoTexto);
     }
 
     // =========================

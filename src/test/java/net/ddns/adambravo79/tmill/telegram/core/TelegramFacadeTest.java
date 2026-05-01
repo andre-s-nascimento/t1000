@@ -1,10 +1,8 @@
-/* (c) 2026 | 27/04/2026 */
+/* (c) 2026 | 01/05/2026 */
 package net.ddns.adambravo79.tmill.telegram.core;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.contains;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import java.io.IOException;
@@ -17,6 +15,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.telegram.telegrambots.meta.api.methods.GetFile;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 
@@ -127,7 +126,7 @@ class TelegramFacadeTest {
     }
 
     // =========================
-    // TelegramFacade
+    // TelegramFacade (novos métodos)
     // =========================
     @Test
     void deveEnviarMensagem() throws Exception {
@@ -192,13 +191,37 @@ class TelegramFacadeTest {
         tgFile.setFileId("fileId");
 
         java.io.File fakeFile = new java.io.File("teste.txt");
-
         when(client.downloadFile(tgFile)).thenReturn(fakeFile);
 
         java.io.File result = facade.downloadFile(tgFile);
 
         assertThat(result).hasName("teste.txt");
         verify(client).downloadFile(tgFile);
+    }
+
+    // NOVO: teste para editar mensagem
+    @Test
+    void deveEditarMensagem() throws Exception {
+        TelegramClient client = mock(TelegramClient.class);
+        TelegramSafeExecutor executor = new TelegramSafeExecutor();
+        TelegramFacade facade = new TelegramFacade(client, executor);
+
+        facade.editarMensagem(123L, 456, "novo texto");
+
+        verify(client).execute(any(EditMessageText.class));
+    }
+
+    // NOVO: teste para answerCallbackQuery (não valida fallback, apenas que a chamada ocorre)
+    @Test
+    void deveAnswerCallbackQuery() throws Exception {
+        TelegramClient client = mock(TelegramClient.class);
+        TelegramSafeExecutor executor = new TelegramSafeExecutor();
+        TelegramFacade facade = new TelegramFacade(client, executor);
+
+        facade.answerCallbackQuery("cb123", "processando", false);
+
+        verify(client)
+                .execute(any(org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery.class));
     }
 
     // =========================
