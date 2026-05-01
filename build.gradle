@@ -1,6 +1,6 @@
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '4.0.5'
+    id 'org.springframework.boot' version '4.0.6'
     id 'io.spring.dependency-management' version '1.1.7'
     id 'jacoco'
     id "com.diffplug.spotless" version "6.25.0"
@@ -93,8 +93,11 @@ check.dependsOn jacocoTestCoverageVerification
 spotless {
     java {
         target 'src/**/*.java'
-
-        googleJavaFormat("1.17.0")
+        
+        // optional: you can specify a specific version (>= 1.8) and/or switch to AOSP style
+        //   and/or reflow long strings
+        //   and/or use custom group artifact (you probably don't need this)
+        googleJavaFormat('1.19.2').aosp().reflowLongStrings().formatJavadoc(false).reorderImports(false).groupArtifact('com.google.googlejavaformat:google-java-format') 
         removeUnusedImports()
 
         importOrder('java', 'javax', 'org', 'com', '')
@@ -103,7 +106,7 @@ spotless {
         endWithNewline()
 
         // evita bagunça de licença
-        licenseHeader '/* (c) $YEAR */'
+        //licenseHeader '/* (c) $YEAR */'
     }
 }
 
