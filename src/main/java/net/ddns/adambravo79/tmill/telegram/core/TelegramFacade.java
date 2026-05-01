@@ -1,10 +1,12 @@
-/* (c) 2026 | 27/04/2026 */
+/* (c) 2026 | 01/05/2026 */
 package net.ddns.adambravo79.tmill.telegram.core;
 
 import org.springframework.stereotype.Component;
+import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.GetFile;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
@@ -135,5 +137,39 @@ public class TelegramFacade {
     public java.io.File downloadFile(org.telegram.telegrambots.meta.api.objects.File tgFile)
             throws TelegramApiException {
         return telegramClient.downloadFile(tgFile);
+    }
+
+    // NOVO: edita uma mensagem existente (útil para remover botões após clique)
+    public void editarMensagem(long chatId, int messageId, String novoTexto) {
+        safeExecutor.run(
+                chatId,
+                this::enviarFallback,
+                () -> {
+                    var editMsg =
+                            EditMessageText.builder()
+                                    .chatId(String.valueOf(chatId))
+                                    .messageId(messageId)
+                                    .text(novoTexto)
+                                    .build();
+                    telegramClient.execute(editMsg);
+                });
+    }
+
+    // NOVO: responde a um callback query (para evitar timeout e dar feedback visual)
+    public void answerCallbackQuery(String callbackQueryId, String mensagem, boolean showAlert) {
+        safeExecutor.run(
+                0L, // chatId não usado no fallback, mas precisamos de um sender dummy. Melhor
+                // tratar
+                // exceção à parte.
+                (id, msg) -> log.warn("Fallback chamado para answerCallbackQuery, ignorando."),
+                () -> {
+                    var answer =
+                            AnswerCallbackQuery.builder()
+                                    .callbackQueryId(callbackQueryId)
+                                    .text(mensagem)
+                                    .showAlert(showAlert)
+                                    .build();
+                    telegramClient.execute(answer);
+                });
     }
 }
