@@ -43,6 +43,7 @@ public class TelegramController implements LongPollingUpdateConsumer {
     private final TelegramFileService fileService;
     private final TelegramFacade telegramFacade;
     private final TelegramSafeExecutor safeExecutor;
+    private final UserInteractionLogger userLogger;
 
     @Value("${t1000.features.transcription-enabled:false}")
     private boolean transcriptionEnabled;
@@ -109,6 +110,34 @@ public class TelegramController implements LongPollingUpdateConsumer {
     // =========================
 
     private void processarUpdate(Update update) {
+        // --- LOG DE USUÁRIO APENAS COM VALIDAÇÃO DE NULL ---
+        if (update.hasCallbackQuery()) {
+            var callback = update.getCallbackQuery();
+            var from = callback != null ? callback.getFrom() : null;
+            if (from != null) {
+                String name =
+                        from.getFirstName()
+                                + (from.getLastName() != null ? " " + from.getLastName() : "");
+                userLogger.logUser(from.getId(), name, "callback:" + callback.getData());
+            }
+        } else if (update.hasMessage()) {
+            var message = update.getMessage();
+            var from = message != null ? message.getFrom() : null;
+            if (from != null) {
+                String name =
+                        from.getFirstName()
+                                + (from.getLastName() != null ? " " + from.getLastName() : "");
+                String action =
+                        message.hasText()
+                                ? "text"
+                                : (message.hasVoice()
+                                        ? "voice"
+                                        : (message.hasAudio() ? "audio" : "other"));
+                userLogger.logUser(from.getId(), name, "message:" + action);
+            }
+        }
+        // --- FIM DO LOG ---
+
         if (update.hasCallbackQuery()) {
             long chatId = update.getCallbackQuery().getMessage().getChatId();
             log.info(
@@ -396,7 +425,16 @@ public class TelegramController implements LongPollingUpdateConsumer {
             long id = Long.parseLong(data.replace("id:", ""));
             var resposta = movieService.buscarPorId(id);
             log.info("✅ Callback de filme chatId={} movieId={}", chatId, id);
-            telegramFacade.enviarFoto(chatId, resposta.urlFoto(), resposta.textoFormatado());
+            String fotoUrl = resposta.urlFoto();
+            if (fotoUrl != null
+                    && !fotoUrl.isBlank()
+                    && (fotoUrl.startsWith("http://") || fotoUrl.startsWith("https://"))) {
+                telegramFacade.enviarFoto(chatId, fotoUrl, resposta.textoFormatado());
+            } else {
+                // Fallback: envia apenas o texto, com indicação de que não há imagem
+                telegramFacade.enviarMensagem(
+                        chatId, resposta.textoFormatado() + "\n\n_(sem imagem)_");
+            }
             return;
         }
 

@@ -123,7 +123,10 @@ public class MovieService {
                         elenco,
                         escapeMarkdown(detalhes.overview()));
 
-        String urlPoster = "https://image.tmdb.org/t/p/w500" + detalhes.posterPath();
+        String urlPoster =
+                detalhes.posterPath() != null && !detalhes.posterPath().isBlank()
+                        ? "https://image.tmdb.org/t/p/w500" + detalhes.posterPath()
+                        : "";
 
         return new MovieOrchestrationResponse(texto, urlPoster);
     }
