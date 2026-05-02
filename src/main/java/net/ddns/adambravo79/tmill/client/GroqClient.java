@@ -1,4 +1,4 @@
-/* (c) 2026 | 27/04/2026 */
+/* (c) 2026 | 02/05/2026 */
 package net.ddns.adambravo79.tmill.client;
 
 import java.io.File;
@@ -21,20 +21,24 @@ import net.ddns.adambravo79.tmill.model.TranscriptionResponse;
 public class GroqClient {
 
     private final RestClient restClient;
+    private final int maxRefinementLength;
 
-    // ✅ Construtor principal usado pelo Spring
     @Autowired
-    public GroqClient(@Value("${groq.api.key}") String apiKey) {
+    public GroqClient(
+            @Value("${groq.api.key}") String apiKey,
+            @Value("${groq.max-refinement-length:10000}") int maxRefinementLength) {
         this.restClient =
                 RestClient.builder()
                         .baseUrl("https://api.groq.com")
                         .defaultHeader("Authorization", "Bearer " + apiKey)
                         .build();
+        this.maxRefinementLength = maxRefinementLength;
     }
 
-    // ✅ Construtor alternativo para testes (sem apiKey, apenas RestClient mockado)
-    public GroqClient(RestClient restClient) {
+    // Construtor para testes
+    public GroqClient(RestClient restClient, int maxRefinementLength) {
         this.restClient = restClient;
+        this.maxRefinementLength = maxRefinementLength;
     }
 
     public String transcrever(File wavFile) {
@@ -66,11 +70,16 @@ public class GroqClient {
     }
 
     public String refinarTexto(String textoBruto) {
-        if (textoBruto.length() > 5000) {
+        // Se ultrapassar o limite configurável, retorna o bruto com aviso (não lança exceção)
+        if (textoBruto.length() > maxRefinementLength) {
             log.warn(
-                    "⚠️ Texto muito longo para refinamento automático size={}",
-                    textoBruto.length());
-            throw new IllegalArgumentException("Texto muito longo para refinamento automático");
+                    "⚠️ Texto muito longo para refinamento automático size={} (limite={})",
+                    textoBruto.length(),
+                    maxRefinementLength);
+            return "⚠️ *Aviso:* O texto excede o limite para refinamento (máx. "
+                    + maxRefinementLength
+                    + " caracteres). Segue a versão bruta:\n\n"
+                    + textoBruto;
         }
 
         log.debug("✨ Refinando texto via Llama 3.1 size={}", textoBruto.length());
@@ -102,7 +111,8 @@ public class GroqClient {
 
         if (response == null || response.choices().isEmpty()) {
             log.error("❌ Groq: resposta inválida no refinamento textoSize={}", textoBruto.length());
-            throw new IllegalStateException("Falha no refinamento — resposta inválida");
+            // Fallback: retorna o texto bruto
+            return textoBruto;
         }
 
         String textoRefinado = response.choices().get(0).message().content();
