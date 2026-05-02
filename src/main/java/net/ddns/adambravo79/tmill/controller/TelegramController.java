@@ -56,6 +56,9 @@ public class TelegramController implements LongPollingUpdateConsumer {
     @Value("${telegram.message.limit:4000}")
     private int telegramMessageLimit;
 
+    @Value("${telegram.bot.name:@t1000paneleiro_bot}")
+    private String botUsername;
+
     private static final long MAX_AUDIO_SIZE_BYTES =
             20 * 1024 * 1024; // fallback, mas será substituído
 
@@ -518,8 +521,47 @@ public class TelegramController implements LongPollingUpdateConsumer {
                                 userId,
                                 fileId,
                                 e);
-                        telegramFacade.enviarMensagem(
-                                userId, "❌ Erro ao processar áudio: " + e.getMessage());
+                        String errorMsg = e.getMessage();
+                        boolean isForbidden =
+                                errorMsg != null
+                                        && errorMsg.contains("403")
+                                        && errorMsg.contains("can't initiate conversation");
+
+                        if (isForbidden) {
+                            // Tenta avisar no grupo que o usuário precisa iniciar conversa com o
+                            // bot
+                            try {
+                                String userMention = "@" + callback.getFrom().getUserName();
+                                if (callback.getFrom().getUserName() == null) {
+                                    userMention = "Usuário";
+                                }
+                                telegramFacade.enviarMensagem(
+                                        groupId,
+                                        "⚠️ "
+                                                + userMention
+                                                + ", você precisa iniciar uma conversa com o bot no"
+                                                + " privado antes de receber transcrições. Envie"
+                                                + " /start para @"
+                                                + botUsername
+                                                + ".");
+                            } catch (Exception ex) {
+                                log.error(
+                                        "Falha ao enviar aviso de 403 para o grupo {}",
+                                        groupId,
+                                        ex);
+                            }
+                        } else {
+                            // Tenta enviar mensagem de erro privada para o usuário
+                            try {
+                                telegramFacade.enviarMensagem(
+                                        userId, "❌ Erro ao processar áudio: " + errorMsg);
+                            } catch (Exception ex) {
+                                log.error(
+                                        "Falha ao enviar mensagem de erro para userId {}",
+                                        userId,
+                                        ex);
+                            }
+                        }
                     }
                 });
     }
