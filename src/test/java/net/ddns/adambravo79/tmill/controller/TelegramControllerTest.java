@@ -1,4 +1,4 @@
-/* (c) 2026 | 01/05/2026 */
+/* (c) 2026 | 02/05/2026 */
 package net.ddns.adambravo79.tmill.controller;
 
 import static org.assertj.core.api.Assertions.*;
@@ -7,6 +7,7 @@ import static org.mockito.Mockito.*;
 
 import java.io.File;
 import java.util.List;
+import java.util.Map;
 import java.util.function.BiConsumer;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -19,6 +20,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMa
 
 import net.ddns.adambravo79.tmill.cache.TranscricaoCache;
 import net.ddns.adambravo79.tmill.client.BloggerClient;
+import net.ddns.adambravo79.tmill.dto.AudioRequest;
 import net.ddns.adambravo79.tmill.model.*;
 import net.ddns.adambravo79.tmill.service.*;
 import net.ddns.adambravo79.tmill.telegram.core.TelegramFacade;
@@ -44,8 +46,7 @@ class TelegramControllerTest {
         cache = mock(TranscricaoCache.class);
         fileService = mock(TelegramFileService.class);
         telegramFacade = mock(TelegramFacade.class);
-        // Usa o executor real (não mock)
-        safeExecutor = new TelegramSafeExecutor();
+        safeExecutor = new TelegramSafeExecutor(); // real
 
         controller =
                 new TelegramController(
@@ -56,6 +57,12 @@ class TelegramControllerTest {
                         fileService,
                         telegramFacade,
                         safeExecutor);
+
+        // Configurar campos injetáveis
+        ReflectionTestUtils.setField(controller, "transcriptionEnabled", true);
+        ReflectionTestUtils.setField(controller, "ownerId", 12345L);
+        ReflectionTestUtils.setField(controller, "maxAudioSizeMb", 20);
+        ReflectionTestUtils.setField(controller, "telegramMessageLimit", 4000);
     }
 
     // =========================
@@ -235,10 +242,13 @@ class TelegramControllerTest {
         when(message.getVoice()).thenReturn(voice);
         when(voice.getFileId()).thenReturn("file-id");
         when(voice.getFileSize()).thenReturn(1024L);
+        when(voice.getDuration()).thenReturn(120); // 🔥 duração em segundos
         when(message.getChat()).thenReturn(chat);
         when(chat.isGroupChat()).thenReturn(true);
         when(message.getFrom()).thenReturn(user);
         when(user.getId()).thenReturn(123L);
+        when(user.getFirstName()).thenReturn("André");
+        when(user.getLastName()).thenReturn("Nascimento");
 
         controller.consume(update);
 
@@ -294,12 +304,23 @@ class TelegramControllerTest {
     void deveProcessarCallbackTranscricaoBrutaEmGrupo() throws Exception {
         ReflectionTestUtils.setField(controller, "transcriptionEnabled", true);
 
+        Map<String, AudioRequest> pendingMap =
+                (Map<String, AudioRequest>)
+                        ReflectionTestUtils.getField(controller, "pendingGroupAudio");
+        String fakeToken = "abc123";
+        long now = System.currentTimeMillis();
+        // Cria o request com senderId e senderName fictícios
+        AudioRequest fakeRequest =
+                createAudioRequest("file123", -100L, now, 1400513378L, "André Teste");
+        pendingMap.put(
+                fakeToken,
+                new AudioRequest(
+                        "file123", -100L, System.currentTimeMillis(), 999L, "Fulano Teste"));
+
         CallbackQuery cb = mock(CallbackQuery.class);
         Message msg = mock(Message.class);
         User user = mock(User.class);
-
-        // 🔥 CORREÇÃO: sem espaço antes do -100
-        when(cb.getData()).thenReturn("trans_bruto|file123|-100");
+        when(cb.getData()).thenReturn("trans_bruto|" + fakeToken);
         when(cb.getMessage()).thenReturn(msg);
         when(msg.getChatId()).thenReturn(-100L);
         when(msg.getMessageId()).thenReturn(42);
@@ -321,13 +342,26 @@ class TelegramControllerTest {
 
         controller.consume(buildCallbackUpdate(cb));
 
-        // Aguarda a conclusão do CompletableFuture.runAsync()
-        Thread.sleep(500);
-
+        verify(telegramFacade, timeout(2000)).enviarMensagemSemMarkdown(eq(999L), anyString());
         verify(telegramFacade)
-                .answerCallbackQuery("cb123", "Processando áudio... enviarei no privado.", false);
-        verify(telegramFacade).enviarMensagem(999L, "🎙️ *Transcrição Bruta:*\ntexto bruto");
-        verify(telegramFacade).editarMensagem(-100L, 42, "✅ Transcrição enviada no privado.");
+                .answerCallbackQuery(
+                        anyString(), eq("Processando áudio... enviarei no privado."), eq(false));
+        assertThat(pendingMap).containsKey(fakeToken);
+    }
+
+    // Método auxiliar para criar instância de AudioRequest via reflexão
+    private AudioRequest createAudioRequest(
+            String fileId, long groupId, long timestamp, long senderId, String senderName) {
+        try {
+            Class<?> innerClass = Class.forName("net.ddns.adambravo79.tmill.dto.AudioRequest");
+            return (AudioRequest)
+                    innerClass
+                            .getDeclaredConstructor(
+                                    String.class, long.class, long.class, long.class, String.class)
+                            .newInstance(fileId, groupId, timestamp, senderId, senderName);
+        } catch (Exception e) {
+            throw new RuntimeException("Não foi possível criar AudioRequest", e);
+        }
     }
 
     // =========================
@@ -433,7 +467,6 @@ class TelegramControllerTest {
         when(voice.getFileSize()).thenReturn(1024L);
         when(message.getFrom()).thenReturn(user);
         when(user.getId()).thenReturn(userId);
-        // Garante que não seja grupo (chat normal privado)
         when(message.getChat()).thenReturn(chat);
         when(chat.isGroupChat()).thenReturn(false);
         when(chat.isSuperGroupChat()).thenReturn(false);

@@ -1,4 +1,4 @@
-/* (c) 2026 | 27/04/2026 */
+/* (c) 2026 | 02/05/2026 */
 package net.ddns.adambravo79.tmill.service;
 
 import java.io.File;
@@ -59,8 +59,6 @@ public class AudioPipelineService {
                                     transcricaoCache.salvar(chatId, refinado);
                                     callback.accept("✨ *Refinado:* \n" + refinado, true);
 
-                                } catch (AudioProcessingException e) {
-                                    throw new CompletionException(e);
                                 } catch (Exception e) {
                                     throw new CompletionException(
                                             new AudioProcessingException(
@@ -77,11 +75,6 @@ public class AudioPipelineService {
                                         (ex instanceof CompletionException && ex.getCause() != null)
                                                 ? ex.getCause()
                                                 : ex;
-
-                                if (causa instanceof AudioProcessingException) {
-                                    throw new CompletionException(causa);
-                                }
-
                                 throw new CompletionException(
                                         new AudioProcessingException(
                                                 "Erro inesperado no pipeline de áudio para arquivo:"
@@ -94,9 +87,7 @@ public class AudioPipelineService {
 
         } catch (CompletionException e) {
             Throwable causa = e.getCause() != null ? e.getCause() : e;
-            if (causa instanceof AudioProcessingException ape) {
-                throw ape;
-            }
+            if (causa instanceof AudioProcessingException ape) throw ape;
             throw new AudioProcessingException(
                     "Erro inesperado no pipeline de áudio para arquivo: " + ogaFile.getName(),
                     causa);
