@@ -172,4 +172,20 @@ public class TelegramFacade {
                     telegramClient.execute(answer);
                 });
     }
+
+    // Novo:
+    public void enviarMensagemSemMarkdown(long chatId, String texto) {
+        safeExecutor.run(
+                chatId,
+                this::enviarFallback,
+                () -> {
+                    var msg =
+                            SendMessage.builder()
+                                    .chatId(String.valueOf(chatId))
+                                    .text(texto)
+                                    // sem .parseMode
+                                    .build();
+                    telegramClient.execute(msg);
+                });
+    }
 }
