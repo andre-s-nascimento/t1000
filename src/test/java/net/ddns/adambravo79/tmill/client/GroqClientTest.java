@@ -1,4 +1,4 @@
-/* (c) 2026 | 27/04/2026 */
+/* (c) 2026 | 02/05/2026 */
 package net.ddns.adambravo79.tmill.client;
 
 import static org.assertj.core.api.Assertions.*;
@@ -34,16 +34,10 @@ class GroqClientTest {
         responseSpec = mock(RestClient.ResponseSpec.class);
 
         when(restClient.post()).thenReturn(uriSpec);
-
-        // ✅ Cobre body(MultiValueMap) — chamado por transcrever()
         lenient().doReturn(bodySpec).when(bodySpec).body(any(MultiValueMap.class));
-        // ✅ Cobre body(Object) — chamado por refinarTexto() com Map
         lenient().doReturn(bodySpec).when(bodySpec).body(any(Object.class));
-
         lenient().doReturn(responseSpec).when(bodySpec).retrieve();
     }
-
-    // --- transcrever ---
 
     private void stubTranscricaoUri() {
         when(uriSpec.uri("/openai/v1/audio/transcriptions")).thenReturn(bodySpec);
@@ -53,12 +47,10 @@ class GroqClientTest {
     @Test
     void deveTranscreverComSucesso() {
         stubTranscricaoUri();
-
         var resp = mock(TranscriptionResponse.class);
         when(resp.text()).thenReturn("Texto transcrito");
         when(responseSpec.body(TranscriptionResponse.class)).thenReturn(resp);
-
-        assertThat(new GroqClient(restClient).transcrever(new File("teste.wav")))
+        assertThat(new GroqClient(restClient, 5000).transcrever(new File("teste.wav")))
                 .isEqualTo("Texto transcrito");
     }
 
@@ -66,13 +58,11 @@ class GroqClientTest {
     void deveFalharQuandoTranscricaoInvalida() {
         stubTranscricaoUri();
         when(responseSpec.body(TranscriptionResponse.class)).thenReturn(null);
-
         assertThatExceptionOfType(IllegalStateException.class)
-                .isThrownBy(() -> new GroqClient(restClient).transcrever(new File("teste.wav")))
+                .isThrownBy(
+                        () -> new GroqClient(restClient, 5000).transcrever(new File("teste.wav")))
                 .withMessageContaining("Falha na transcrição");
     }
-
-    // --- refinarTexto ---
 
     private void stubRefinoUri() {
         when(uriSpec.uri("/openai/v1/chat/completions")).thenReturn(bodySpec);
@@ -82,32 +72,28 @@ class GroqClientTest {
     @Test
     void deveRefinarTextoComSucesso() {
         stubRefinoUri();
-
         var resp =
                 new ChatCompletionResponse(
                         List.of(new Choice(new Message("assistant", "Texto refinado"))));
         when(responseSpec.body(ChatCompletionResponse.class)).thenReturn(resp);
-
-        assertThat(new GroqClient(restClient).refinarTexto("Texto bruto"))
+        assertThat(new GroqClient(restClient, 5000).refinarTexto("Texto bruto"))
                 .isEqualTo("Texto refinado");
     }
 
     @Test
-    void deveFalharQuandoRefinoInvalido() {
+    void deveRetornarTextoBrutoQuandoRefinoInvalido() {
         stubRefinoUri();
         when(responseSpec.body(ChatCompletionResponse.class)).thenReturn(null);
-
-        assertThatExceptionOfType(IllegalStateException.class)
-                .isThrownBy(() -> new GroqClient(restClient).refinarTexto("Texto bruto"))
-                .withMessageContaining("Falha no refinamento");
+        String resultado = new GroqClient(restClient, 5000).refinarTexto("Texto bruto");
+        assertThat(resultado).isEqualTo("Texto bruto");
     }
 
-    // --- validação de entrada ---
-
     @Test
-    void deveFalharQuandoTextoMuitoLongo() {
-        assertThatExceptionOfType(IllegalArgumentException.class)
-                .isThrownBy(() -> new GroqClient(restClient).refinarTexto("x".repeat(6000)))
-                .withMessageContaining("Texto muito longo");
+    void deveRetornarTextoBrutoComAvisoQuandoMuitoLongo() {
+        String textoLongo = "x".repeat(6000);
+        GroqClient client = new GroqClient(restClient, 5000);
+        String resultado = client.refinarTexto(textoLongo);
+        assertThat(resultado).startsWith("⚠️ *Aviso:* O texto excede o limite");
+        assertThat(resultado).contains(textoLongo);
     }
 }

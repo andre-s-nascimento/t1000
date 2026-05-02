@@ -1,4 +1,4 @@
-/* (c) 2026 | 01/05/2026 */
+/* (c) 2026 | 02/05/2026 */
 package net.ddns.adambravo79.tmill.controller;
 
 import static org.assertj.core.api.Assertions.*;
@@ -7,6 +7,9 @@ import static org.mockito.Mockito.*;
 
 import java.io.File;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -44,8 +47,7 @@ class TelegramControllerTest {
         cache = mock(TranscricaoCache.class);
         fileService = mock(TelegramFileService.class);
         telegramFacade = mock(TelegramFacade.class);
-        // Usa o executor real (não mock)
-        safeExecutor = new TelegramSafeExecutor();
+        safeExecutor = new TelegramSafeExecutor(); // real
 
         controller =
                 new TelegramController(
@@ -56,6 +58,12 @@ class TelegramControllerTest {
                         fileService,
                         telegramFacade,
                         safeExecutor);
+
+        // Configurar campos injetáveis
+        ReflectionTestUtils.setField(controller, "transcriptionEnabled", true);
+        ReflectionTestUtils.setField(controller, "ownerId", 12345L);
+        ReflectionTestUtils.setField(controller, "maxAudioSizeMb", 20);
+        ReflectionTestUtils.setField(controller, "telegramMessageLimit", 4000);
     }
 
     // =========================
@@ -294,12 +302,21 @@ class TelegramControllerTest {
     void deveProcessarCallbackTranscricaoBrutaEmGrupo() throws Exception {
         ReflectionTestUtils.setField(controller, "transcriptionEnabled", true);
 
+        // Prepara um token fictício e injeta no mapa interno
+        Map<String, TelegramController.AudioRequest> pendingMap =
+                (Map<String, TelegramController.AudioRequest>)
+                        ReflectionTestUtils.getField(controller, "pendingGroupAudio");
+        String fakeToken = "abc123";
+        // Usa reflexão para criar uma instância do record (alternativa: tornar o record
+        // package-private)
+        TelegramController.AudioRequest fakeRequest = createAudioRequest("file123", -100L);
+        pendingMap.put(fakeToken, fakeRequest);
+
         CallbackQuery cb = mock(CallbackQuery.class);
         Message msg = mock(Message.class);
         User user = mock(User.class);
 
-        // 🔥 CORREÇÃO: sem espaço antes do -100
-        when(cb.getData()).thenReturn("trans_bruto|file123|-100");
+        when(cb.getData()).thenReturn("trans_bruto|" + fakeToken);
         when(cb.getMessage()).thenReturn(msg);
         when(msg.getChatId()).thenReturn(-100L);
         when(msg.getMessageId()).thenReturn(42);
@@ -319,15 +336,38 @@ class TelegramControllerTest {
                 .when(audioService)
                 .processarFluxoAudio(any(), eq(999L), any());
 
+        CountDownLatch latch = new CountDownLatch(1);
+        doAnswer(
+                        inv -> {
+                            latch.countDown();
+                            return null;
+                        })
+                .when(telegramFacade)
+                .editarMensagem(anyLong(), anyInt(), anyString());
+
         controller.consume(buildCallbackUpdate(cb));
 
-        // Aguarda a conclusão do CompletableFuture.runAsync()
-        Thread.sleep(500);
+        assertThat(latch.await(2, TimeUnit.SECONDS)).isTrue();
 
         verify(telegramFacade)
                 .answerCallbackQuery("cb123", "Processando áudio... enviarei no privado.", false);
         verify(telegramFacade).enviarMensagem(999L, "🎙️ *Transcrição Bruta:*\ntexto bruto");
         verify(telegramFacade).editarMensagem(-100L, 42, "✅ Transcrição enviada no privado.");
+    }
+
+    // Método auxiliar para criar instância de AudioRequest via reflexão
+    private TelegramController.AudioRequest createAudioRequest(String fileId, long groupId) {
+        try {
+            Class<?> innerClass =
+                    Class.forName(
+                            "net.ddns.adambravo79.tmill.controller.TelegramController$AudioRequest");
+            return (TelegramController.AudioRequest)
+                    innerClass
+                            .getDeclaredConstructor(String.class, long.class)
+                            .newInstance(fileId, groupId);
+        } catch (Exception e) {
+            throw new RuntimeException("Não foi possível criar AudioRequest", e);
+        }
     }
 
     // =========================
@@ -433,7 +473,6 @@ class TelegramControllerTest {
         when(voice.getFileSize()).thenReturn(1024L);
         when(message.getFrom()).thenReturn(user);
         when(user.getId()).thenReturn(userId);
-        // Garante que não seja grupo (chat normal privado)
         when(message.getChat()).thenReturn(chat);
         when(chat.isGroupChat()).thenReturn(false);
         when(chat.isSuperGroupChat()).thenReturn(false);

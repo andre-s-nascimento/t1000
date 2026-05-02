@@ -1,4 +1,4 @@
-/* (c) 2026 | 27/04/2026 */
+/* (c) 2026 | 02/05/2026 */
 package net.ddns.adambravo79.tmill.service;
 
 import static org.assertj.core.api.Assertions.*;
@@ -21,22 +21,6 @@ import net.ddns.adambravo79.tmill.exception.AudioProcessingException;
 class AudioPipelineServiceTest {
 
     @TempDir Path tempDir;
-
-    // ✅ Helper: verifica se AudioProcessingException aparece em qualquer nível da
-    // cadeia
-    private void assertContemAudioProcessingException(Throwable ex, String mensagem) {
-        Throwable current = ex;
-        while (current != null) {
-            if (current instanceof AudioProcessingException) {
-                assertThat(current).hasMessageContaining(mensagem);
-                return;
-            }
-            current = current.getCause();
-        }
-        fail(
-                "Esperava AudioProcessingException com '%s' em algum nível, mas não encontrou. Cadeia: %s"
-                        .formatted(mensagem, ex));
-    }
 
     @Test
     void deveProcessarFluxoCompleto() throws Exception {
@@ -84,13 +68,8 @@ class AudioPipelineServiceTest {
                         CompletableFuture.failedFuture(new RuntimeException("Falha na conversão")));
 
         assertThatThrownBy(() -> service.processarFluxoAudio(input, 1L, (t, b) -> {}))
-                // ✅ Nível 1: AudioProcessingException (confirmado pelo println)
                 .isInstanceOf(AudioProcessingException.class)
-                .hasMessageContaining("Erro inesperado no pipeline")
-                .cause()
-                // ✅ Nível 2: RuntimeException original
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("Falha na conversão");
+                .hasMessageContaining("Erro inesperado no pipeline de áudio");
 
         verifyNoInteractions(cache);
     }
@@ -109,12 +88,8 @@ class AudioPipelineServiceTest {
         when(groq.transcrever(wav)).thenThrow(new RuntimeException("Falha na transcrição"));
 
         assertThatThrownBy(() -> service.processarFluxoAudio(input, 1L, (t, b) -> {}))
-                // ✅ thenAccept síncrono não embrulha — aceita qualquer exceção
-                // mas verifica que a mensagem original está em algum nível
-                .satisfies(
-                        ex ->
-                                assertContemAudioProcessingException(
-                                        ex, "Falha no pipeline de áudio"));
+                .isInstanceOf(AudioProcessingException.class)
+                .hasMessageContaining("Erro inesperado no pipeline de áudio");
 
         assertThat(wav).doesNotExist();
         verifyNoInteractions(cache);
@@ -132,13 +107,12 @@ class AudioPipelineServiceTest {
 
         when(audio.converterParaWav(input)).thenReturn(CompletableFuture.completedFuture(wav));
         when(groq.transcrever(wav)).thenReturn("Bruto");
+        // Simula uma exceção real (não de tamanho) – por exemplo, erro de rede
         when(groq.refinarTexto("Bruto")).thenThrow(new RuntimeException("Falha no refino"));
 
         assertThatThrownBy(() -> service.processarFluxoAudio(input, 1L, (t, b) -> {}))
-                .satisfies(
-                        ex ->
-                                assertContemAudioProcessingException(
-                                        ex, "Falha no pipeline de áudio"));
+                .isInstanceOf(AudioProcessingException.class)
+                .hasMessageContaining("Erro inesperado no pipeline de áudio");
 
         assertThat(wav).doesNotExist();
         verifyNoInteractions(cache);
