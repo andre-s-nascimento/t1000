@@ -36,6 +36,7 @@ import net.ddns.adambravo79.tmill.telegram.core.TelegramSafeExecutor;
 @RequiredArgsConstructor
 public class TelegramController implements LongPollingUpdateConsumer {
 
+    private final UserInteractionLogger userLogger;
     private final MovieService movieService;
     private final AudioPipelineService audioService;
     private final BloggerClient bloggerClient;
@@ -109,6 +110,25 @@ public class TelegramController implements LongPollingUpdateConsumer {
     // =========================
 
     private void processarUpdate(Update update) {
+        // --- LOG DE USUÁRIO (independente do tipo) ---
+        if (update.hasCallbackQuery()) {
+            var callback = update.getCallbackQuery();
+            var from = callback.getFrom();
+            String name =
+                    from.getFirstName()
+                            + (from.getLastName() != null ? " " + from.getLastName() : "");
+            userLogger.logUser(from.getId(), name, "callback:" + callback.getData());
+        } else if (update.hasMessage()) {
+            var message = update.getMessage();
+            var from = message.getFrom();
+            String name =
+                    from.getFirstName()
+                            + (from.getLastName() != null ? " " + from.getLastName() : "");
+            String action = message.hasText() ? "text" : (message.hasVoice() ? "voice" : "audio");
+            userLogger.logUser(from.getId(), name, "message:" + action);
+        }
+        // --- FIM DO LOG ---
+
         if (update.hasCallbackQuery()) {
             long chatId = update.getCallbackQuery().getMessage().getChatId();
             log.info(
