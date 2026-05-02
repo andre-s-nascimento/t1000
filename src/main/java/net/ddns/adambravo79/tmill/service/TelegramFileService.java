@@ -2,6 +2,10 @@
 package net.ddns.adambravo79.tmill.service;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.methods.GetFile;
@@ -37,20 +41,41 @@ public class TelegramFileService {
         try {
             log.debug("Baixando arquivo do Telegram fileId={}", fileId);
 
+            // 1. Obtém metadados do arquivo
             org.telegram.telegrambots.meta.api.objects.File tgFile =
                     telegramFacade.getFile(new GetFile(fileId));
 
-            File localFile = telegramFacade.downloadFile(tgFile);
+            // 2. Download para um arquivo temporário
+            File tempFile = telegramFacade.downloadFile(tgFile);
 
-            if (localFile == null || !localFile.exists()) {
-                throw new TelegramFileException("Arquivo não encontrado após download", null);
+            if (tempFile == null || !tempFile.exists()) {
+                throw new TelegramFileException(
+                        "Arquivo não encontrado após download: " + fileId, null);
             }
 
-            return localFile;
+            // 3. Cria um arquivo definitivo com extensão .oga (ou mantém a original)
+            String destFileName = tempFile.getAbsolutePath().replace(".tmp", ".oga");
+            File destFile = new File(destFileName);
+
+            // 4. Move o arquivo temporário para o destino final (com sobrescrita)
+            Path source = tempFile.toPath();
+            Path target = destFile.toPath();
+
+            Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
+
+            log.info(
+                    "Arquivo baixado com sucesso: {} -> {}",
+                    tempFile.getName(),
+                    destFile.getName());
+            return destFile;
 
         } catch (TelegramApiException e) {
-            log.error("Erro ao baixar arquivo fileId={}", fileId, e);
-            throw new TelegramFileException("Falha ao baixar arquivo do Telegram", e);
+            log.error("Erro na API do Telegram ao baixar arquivo fileId={}", fileId, e);
+            throw new TelegramFileException(
+                    "Falha ao baixar arquivo do Telegram: " + e.getMessage(), e);
+        } catch (IOException e) {
+            log.error("Erro de I/O ao mover arquivo fileId={}", fileId, e);
+            throw new TelegramFileException("Erro ao salvar arquivo baixado: " + e.getMessage(), e);
         }
     }
 }
