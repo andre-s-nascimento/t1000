@@ -36,7 +36,6 @@ import net.ddns.adambravo79.tmill.telegram.core.TelegramSafeExecutor;
 @RequiredArgsConstructor
 public class TelegramController implements LongPollingUpdateConsumer {
 
-    private final UserInteractionLogger userLogger;
     private final MovieService movieService;
     private final AudioPipelineService audioService;
     private final BloggerClient bloggerClient;
@@ -44,6 +43,7 @@ public class TelegramController implements LongPollingUpdateConsumer {
     private final TelegramFileService fileService;
     private final TelegramFacade telegramFacade;
     private final TelegramSafeExecutor safeExecutor;
+    private final UserInteractionLogger userLogger;
 
     @Value("${t1000.features.transcription-enabled:false}")
     private boolean transcriptionEnabled;
@@ -110,22 +110,31 @@ public class TelegramController implements LongPollingUpdateConsumer {
     // =========================
 
     private void processarUpdate(Update update) {
-        // --- LOG DE USUÁRIO (independente do tipo) ---
+        // --- LOG DE USUÁRIO APENAS COM VALIDAÇÃO DE NULL ---
         if (update.hasCallbackQuery()) {
             var callback = update.getCallbackQuery();
-            var from = callback.getFrom();
-            String name =
-                    from.getFirstName()
-                            + (from.getLastName() != null ? " " + from.getLastName() : "");
-            userLogger.logUser(from.getId(), name, "callback:" + callback.getData());
+            var from = callback != null ? callback.getFrom() : null;
+            if (from != null) {
+                String name =
+                        from.getFirstName()
+                                + (from.getLastName() != null ? " " + from.getLastName() : "");
+                userLogger.logUser(from.getId(), name, "callback:" + callback.getData());
+            }
         } else if (update.hasMessage()) {
             var message = update.getMessage();
-            var from = message.getFrom();
-            String name =
-                    from.getFirstName()
-                            + (from.getLastName() != null ? " " + from.getLastName() : "");
-            String action = message.hasText() ? "text" : (message.hasVoice() ? "voice" : "audio");
-            userLogger.logUser(from.getId(), name, "message:" + action);
+            var from = message != null ? message.getFrom() : null;
+            if (from != null) {
+                String name =
+                        from.getFirstName()
+                                + (from.getLastName() != null ? " " + from.getLastName() : "");
+                String action =
+                        message.hasText()
+                                ? "text"
+                                : (message.hasVoice()
+                                        ? "voice"
+                                        : (message.hasAudio() ? "audio" : "other"));
+                userLogger.logUser(from.getId(), name, "message:" + action);
+            }
         }
         // --- FIM DO LOG ---
 
