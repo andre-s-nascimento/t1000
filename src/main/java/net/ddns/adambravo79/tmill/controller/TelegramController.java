@@ -416,7 +416,16 @@ public class TelegramController implements LongPollingUpdateConsumer {
             long id = Long.parseLong(data.replace("id:", ""));
             var resposta = movieService.buscarPorId(id);
             log.info("✅ Callback de filme chatId={} movieId={}", chatId, id);
-            telegramFacade.enviarFoto(chatId, resposta.urlFoto(), resposta.textoFormatado());
+            String fotoUrl = resposta.urlFoto();
+            if (fotoUrl != null
+                    && !fotoUrl.isBlank()
+                    && (fotoUrl.startsWith("http://") || fotoUrl.startsWith("https://"))) {
+                telegramFacade.enviarFoto(chatId, fotoUrl, resposta.textoFormatado());
+            } else {
+                // Fallback: envia apenas o texto, com indicação de que não há imagem
+                telegramFacade.enviarMensagem(
+                        chatId, resposta.textoFormatado() + "\n\n_(sem imagem)_");
+            }
             return;
         }
 
