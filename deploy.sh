@@ -86,7 +86,9 @@ run_container() {
         --name "$APP_NAME" \
         --restart unless-stopped \
         --env-file .env \
+        -e TZ=America/Sao_Paulo \
         -v "$DATA_PATH:/app/temp_audio" \
+        -v "$(pwd)/logs:/app/logs" \
         --memory="700m" \
         --cpus="0.8" \
         "$DOCKER_IMAGE" || {

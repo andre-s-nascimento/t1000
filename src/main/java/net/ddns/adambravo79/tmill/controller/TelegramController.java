@@ -1,4 +1,4 @@
-/* (c) 2026 | 02/05/2026 */
+/* (c) 2026 | 03/05/2026 */
 package net.ddns.adambravo79.tmill.controller;
 
 import java.io.File;
@@ -435,6 +435,13 @@ public class TelegramController implements LongPollingUpdateConsumer {
                 telegramFacade.enviarMensagem(
                         chatId, resposta.textoFormatado() + "\n\n_(sem imagem)_");
             }
+            // 🔥 Editar a mensagem original (com os botões) para remover o teclado e avisar que o
+            // filme
+            // foi selecionado
+            int messageId = cb.getMessage().getMessageId();
+            String newText =
+                    "✅ Filme selecionado: " + resposta.textoFormatado().split("\n")[0]; // título
+            telegramFacade.editarMensagem(chatId, messageId, newText); // remove o inline keyboard
             return;
         }
 
