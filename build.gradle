@@ -47,6 +47,11 @@ configurations.all {
     resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
 }
 
+// Desabilita o configuration cache APENAS para tarefas do Spotless
+tasks.withType(com.diffplug.gradle.spotless.SpotlessTask).configureEach {
+    notCompatibleWithConfigurationCache("Spotless has compatibility issues with configuration cache")
+}
+
 tasks.withType(JavaCompile) {
     options.fork = true
     options.forkOptions.memoryMaximumSize = '256m'
