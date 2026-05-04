@@ -82,6 +82,7 @@ run_container() {
 
     mkdir -p "$DATA_PATH"
     mkdir -p "$(pwd)/logs"
+    chmod 777 "$(pwd)/logs"
 
     docker run -d \
         --name "$APP_NAME" \
