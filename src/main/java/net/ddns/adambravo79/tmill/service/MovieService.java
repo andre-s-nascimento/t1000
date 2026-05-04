@@ -121,7 +121,8 @@ public class MovieService {
                         linkTmdb,
                         streamings,
                         elenco,
-                        escapeMarkdown(detalhes.overview()));
+                        escapeMarkdown(detalhes.overview()),
+                        getEasterEgg(id).orElse(""));
 
         String urlPoster =
                 detalhes.posterPath() != null && !detalhes.posterPath().isBlank()
@@ -149,5 +150,16 @@ public class MovieService {
                 .replace("]", "\\]")
                 .replace("(", "\\(")
                 .replace(")", "\\)");
+    }
+
+    private Optional<String> getEasterEgg(long movieId) {
+        if (movieId == 280L) {
+            return Optional.of(
+                    "\n\n"
+                            + "🤖 *Review do T-1000:* \"Eu já vi esse filme, e não gostei muito do"
+                            + " final\"");
+        }
+        // Futuro: adicionar outros IDs com mensagens especiais
+        return Optional.empty();
     }
 }
