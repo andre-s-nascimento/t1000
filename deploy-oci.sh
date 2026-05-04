@@ -1,12 +1,11 @@
 #!/bin/bash
-
-set -e  # para o script em qualquer erro
+set -e
 
 # ==============================
 # 🔧 CONFIGURAÇÕES
 # ==============================
 APP_NAME="t1000-bot"
-IMAGE_NAME="adambravo/t1000-bot"
+IMAGE_NAME="andresnascimento/t1000-bot"
 IMAGE_TAG="latest"
 DOCKER_IMAGE="$IMAGE_NAME:$IMAGE_TAG"
 
@@ -50,14 +49,15 @@ load_env() {
 }
 
 # ==============================
-# 🛠 BUILD
+# 📦 PULL DA IMAGEM (OCI)
 # ==============================
-build_image() {
-    log_info "Construindo imagem Docker: $DOCKER_IMAGE"
-    docker build -t "$DOCKER_IMAGE" . || {
-        log_error "Falha no build"
+pull_image() {
+    log_info "Baixando imagem do Docker Hub: $DOCKER_IMAGE"
+    docker pull "$DOCKER_IMAGE" || {
+        log_error "Falha ao baixar imagem. Verifique sua conexão e login."
         exit 1
     }
+    log_info "✅ Imagem baixada com sucesso."
 }
 
 # ==============================
@@ -70,7 +70,7 @@ stop_container() {
 }
 
 cleanup_docker() {
-    log_info "🧹 Limpando imagens dangling..."
+    log_info "🧹 Removendo imagens não utilizadas (opcional)..."
     docker image prune -f &>/dev/null || true
 }
 
@@ -81,6 +81,7 @@ run_container() {
     log_info "Iniciando container do $APP_NAME"
 
     mkdir -p "$DATA_PATH"
+    mkdir -p "$(pwd)/logs"
 
     docker run -d \
         --name "$APP_NAME" \
@@ -90,7 +91,7 @@ run_container() {
         -v "$DATA_PATH:/app/temp_audio" \
         -v "$(pwd)/logs:/app/logs" \
         --memory="700m" \
-        --memory-reservation="512m" \ # Garante que o container não use mais que 512MB se o host estiver sobrecarregado
+        --memory-reservation="512m" \
         --cpus="0.8" \
         "$DOCKER_IMAGE" || {
             log_error "Erro ao iniciar container"
@@ -120,51 +121,44 @@ logs_follow() {
 # ==============================
 main() {
     echo "========================================="
-    echo "🤖 Deploy Automatizado - $APP_NAME"
+    echo "☁️ Deploy OCI - $APP_NAME (pull da imagem)"
     echo "========================================="
 
     check_docker
     load_env
 
     case "${1:-deploy}" in
-
         deploy)
-            log_info "Modo: deploy completo"
-            build_image
+            log_info "Modo: deploy OCI completo (pull + restart)"
+            pull_image
             stop_container
             run_container
             cleanup_docker
             show_status
             show_logs
             ;;
-
-        build)
-            log_info "Modo: build only"
-            build_image
-            ;;
-
         restart)
-            log_info "Modo: restart"
+            log_info "Modo: restart apenas"
+            pull_image
             stop_container
             run_container
             show_status
             ;;
-
         stop)
             stop_container
             log_info "Container parado"
             ;;
-
         logs)
             logs_follow
             ;;
-
         status)
             show_status
             ;;
-
+        pull)
+            pull_image
+            ;;
         *)
-            echo "Uso: $0 {deploy|build|restart|stop|logs|status}"
+            echo "Uso: $0 {deploy|restart|stop|logs|status|pull}"
             exit 1
             ;;
     esac
