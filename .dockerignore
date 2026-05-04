@@ -1,0 +1,16 @@
+.git
+.gitignore
+.gradle
+build
+logs
+temp_audio
+*.log
+*.tmp
+.idea
+.vscode
+*.md
+docs
+deploy.sh
+build-and-push.*
+.env
+**/node_modules

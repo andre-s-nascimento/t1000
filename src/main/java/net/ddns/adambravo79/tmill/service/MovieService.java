@@ -112,7 +112,7 @@ public class MovieService {
 
             👥 *Elenco:* %s
 
-            📖 *Sinopse:* %s
+            📖 *Sinopse:* %s%s
             """,
                         detalhes.title().toUpperCase(),
                         ano,
@@ -121,9 +121,13 @@ public class MovieService {
                         linkTmdb,
                         streamings,
                         elenco,
-                        escapeMarkdown(detalhes.overview()));
+                        escapeMarkdown(detalhes.overview()),
+                        getEasterEgg(id).orElse(""));
 
-        String urlPoster = "https://image.tmdb.org/t/p/w500" + detalhes.posterPath();
+        String urlPoster =
+                detalhes.posterPath() != null && !detalhes.posterPath().isBlank()
+                        ? "https://image.tmdb.org/t/p/w500" + detalhes.posterPath()
+                        : "";
 
         return new MovieOrchestrationResponse(texto, urlPoster);
     }
@@ -146,5 +150,17 @@ public class MovieService {
                 .replace("]", "\\]")
                 .replace("(", "\\(")
                 .replace(")", "\\)");
+    }
+
+    private Optional<String> getEasterEgg(long movieId) {
+        if (movieId == 280L) {
+            log.info("Easter Egg ativado para 'O Exterminador do Futuro 2' (ID: 280)");
+            return Optional.of(
+                    "\n\n"
+                            + "🤖 *Review do T-1000:* \"Eu já vi esse filme, e não gostei muito do"
+                            + " final\"");
+        }
+        // Futuro: adicionar outros IDs com mensagens especiais
+        return Optional.empty();
     }
 }

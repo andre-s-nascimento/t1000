@@ -47,6 +47,7 @@ class TelegramControllerTest {
         fileService = mock(TelegramFileService.class);
         telegramFacade = mock(TelegramFacade.class);
         safeExecutor = new TelegramSafeExecutor(); // real
+        UserInteractionLogger userLogger = mock(UserInteractionLogger.class); // 🆕
 
         controller =
                 new TelegramController(
@@ -56,7 +57,8 @@ class TelegramControllerTest {
                         cache,
                         fileService,
                         telegramFacade,
-                        safeExecutor);
+                        safeExecutor,
+                        userLogger); // 🆕
 
         // Configurar campos injetáveis
         ReflectionTestUtils.setField(controller, "transcriptionEnabled", true);
@@ -290,14 +292,30 @@ class TelegramControllerTest {
     }
 
     @Test
-    void deveProcessarCallbackId() {
+    void deveEnviarFotoQuandoUrlValida() {
         when(movieService.buscarPorId(123L))
-                .thenReturn(new MovieOrchestrationResponse("texto", "url"));
+                .thenReturn(
+                        new MovieOrchestrationResponse(
+                                "texto", "https://image.tmdb.org/t/p/w500/poster.jpg"));
 
         controller.consume(buildCallbackUpdate(1L, "id:123"));
 
         verify(movieService).buscarPorId(123L);
-        verify(telegramFacade).enviarFoto(eq(1L), anyString(), anyString());
+        verify(telegramFacade)
+                .enviarFoto(eq(1L), eq("https://image.tmdb.org/t/p/w500/poster.jpg"), anyString());
+        verify(telegramFacade, never()).enviarMensagem(anyLong(), anyString());
+    }
+
+    @Test
+    void deveEnviarMensagemSemImagemQuandoUrlInvalida() {
+        when(movieService.buscarPorId(123L))
+                .thenReturn(new MovieOrchestrationResponse("texto", ""));
+
+        controller.consume(buildCallbackUpdate(1L, "id:123"));
+
+        verify(movieService).buscarPorId(123L);
+        verify(telegramFacade).enviarMensagem(eq(1L), contains("texto"));
+        verify(telegramFacade, never()).enviarFoto(anyLong(), anyString(), anyString());
     }
 
     @Test
@@ -308,10 +326,7 @@ class TelegramControllerTest {
                 (Map<String, AudioRequest>)
                         ReflectionTestUtils.getField(controller, "pendingGroupAudio");
         String fakeToken = "abc123";
-        long now = System.currentTimeMillis();
         // Cria o request com senderId e senderName fictícios
-        AudioRequest fakeRequest =
-                createAudioRequest("file123", -100L, now, 1400513378L, "André Teste");
         pendingMap.put(
                 fakeToken,
                 new AudioRequest(
@@ -347,21 +362,6 @@ class TelegramControllerTest {
                 .answerCallbackQuery(
                         anyString(), eq("Processando áudio... enviarei no privado."), eq(false));
         assertThat(pendingMap).containsKey(fakeToken);
-    }
-
-    // Método auxiliar para criar instância de AudioRequest via reflexão
-    private AudioRequest createAudioRequest(
-            String fileId, long groupId, long timestamp, long senderId, String senderName) {
-        try {
-            Class<?> innerClass = Class.forName("net.ddns.adambravo79.tmill.dto.AudioRequest");
-            return (AudioRequest)
-                    innerClass
-                            .getDeclaredConstructor(
-                                    String.class, long.class, long.class, long.class, String.class)
-                            .newInstance(fileId, groupId, timestamp, senderId, senderName);
-        } catch (Exception e) {
-            throw new RuntimeException("Não foi possível criar AudioRequest", e);
-        }
     }
 
     // =========================
@@ -478,6 +478,7 @@ class TelegramControllerTest {
         var update = mock(Update.class);
         var cb = mock(CallbackQuery.class);
         var message = mock(Message.class);
+        var user = mock(User.class);
 
         when(update.hasCallbackQuery()).thenReturn(true);
         when(update.getCallbackQuery()).thenReturn(cb);
@@ -485,6 +486,10 @@ class TelegramControllerTest {
         when(cb.getMessage()).thenReturn(message);
         when(message.getChatId()).thenReturn(chatId);
         when(cb.getId()).thenReturn("fake-cb-id");
+        when(cb.getFrom()).thenReturn(user); // 🔥 ESSENCIAL
+        when(user.getId()).thenReturn(987654L);
+        when(user.getFirstName()).thenReturn("Testador");
+        when(user.getLastName()).thenReturn("Silva");
 
         return update;
     }
