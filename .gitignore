@@ -44,5 +44,6 @@ obter-refresh-token.sh
 mile-stone.sh
 temp_audio/**
 **/temp_audio/
-logs_backup/logs/users_2026-05-02.txt
-logs_backup/logs/users_2026-05-03.txt
+logs_backup/**
+logs_backup/**
+logs/**

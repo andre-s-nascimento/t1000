@@ -112,7 +112,7 @@ public class MovieService {
 
             👥 *Elenco:* %s
 
-            📖 *Sinopse:* %s
+            📖 *Sinopse:* %s%s
             """,
                         detalhes.title().toUpperCase(),
                         ano,
@@ -154,6 +154,7 @@ public class MovieService {
 
     private Optional<String> getEasterEgg(long movieId) {
         if (movieId == 280L) {
+            log.info("Easter Egg ativado para 'O Exterminador do Futuro 2' (ID: 280)");
             return Optional.of(
                     "\n\n"
                             + "🤖 *Review do T-1000:* \"Eu já vi esse filme, e não gostei muito do"
