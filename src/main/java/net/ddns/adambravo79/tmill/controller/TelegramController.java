@@ -68,6 +68,7 @@ public class TelegramController implements LongPollingUpdateConsumer {
 
     private final Set<Long> allowedGroups = new HashSet<>();
     private final Set<Long> warnedGroups = ConcurrentHashMap.newKeySet(); // evita spam de log
+    private final Set<Long> warnedUsersFor403 = ConcurrentHashMap.newKeySet();
 
     private static final long MAX_AUDIO_SIZE_BYTES = 20 * 1024 * 1024; // fallback
 
@@ -615,25 +616,31 @@ public class TelegramController implements LongPollingUpdateConsumer {
                                         && errorMsg.contains("can't initiate conversation");
 
                         if (isForbidden && groupId != 0) {
-                            try {
-                                String userMention =
-                                        callback.getFrom().getUserName() != null
-                                                ? "@" + callback.getFrom().getUserName()
-                                                : "Usuário";
-                                telegramFacade.enviarMensagem(
-                                        groupId,
-                                        "⚠️ "
-                                                + userMention
-                                                + ", você precisa iniciar uma conversa com o bot no"
-                                                + " privado antes de receber transcrições. Envie"
-                                                + " /start para @"
-                                                + botUsername
-                                                + ".");
-                            } catch (Exception ex) {
-                                log.error(
-                                        "Falha ao enviar aviso de 403 para o grupo {}",
-                                        groupId,
-                                        ex);
+                            if (warnedUsersFor403.add(userId)) {
+                                try {
+                                    String userMention =
+                                            callback.getFrom().getUserName() != null
+                                                    ? "@" + callback.getFrom().getUserName()
+                                                    : "Usuário";
+                                    telegramFacade.enviarMensagem(
+                                            groupId,
+                                            "⚠️ "
+                                                    + userMention
+                                                    + ", você precisa iniciar uma conversa com o"
+                                                    + " bot no privado antes de receber"
+                                                    + " transcrições. Envie /start para @"
+                                                    + botUsername
+                                                    + ".");
+                                } catch (Exception ex) {
+                                    log.error(
+                                            "Falha ao enviar aviso de 403 para o grupo {}",
+                                            groupId,
+                                            ex);
+                                }
+                            } else {
+                                log.debug(
+                                        "Usuário {} já avisado sobre 403, suprimindo novo aviso.",
+                                        userId);
                             }
                         } else {
                             try {

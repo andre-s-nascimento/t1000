@@ -91,6 +91,7 @@ run_container() {
         -e TZ=America/Sao_Paulo \
         -v "$DATA_PATH:/app/temp_audio" \
         -v "$(pwd)/logs:/app/logs" \
+        -v "$(pwd)/config/easter-eggs.json:/app/config/easter-eggs.json" \
         --memory="700m" \
         --memory-reservation="512m" \
         --cpus="0.8" \
