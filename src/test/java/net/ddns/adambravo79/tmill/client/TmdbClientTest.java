@@ -1,4 +1,4 @@
-/* (c) 2026 | 27/04/2026 */
+/* (c) 2026 | 06/05/2026 */
 package net.ddns.adambravo79.tmill.client;
 
 import static org.assertj.core.api.Assertions.*;
@@ -103,7 +103,9 @@ class TmdbClientTest {
     @Test
     void deveBuscarElencoComSucesso() {
         when(responseSpec.body(CreditsResponse.class))
-                .thenReturn(new CreditsResponse(List.of(new CastRecord("Ator", "Personagem"))));
+                .thenReturn(
+                        new CreditsResponse(
+                                List.of(new CastRecord("Ator", "Personagem")), List.of()));
 
         List<CastRecord> elenco = new TmdbClient(restClient).buscarElenco(1L);
 

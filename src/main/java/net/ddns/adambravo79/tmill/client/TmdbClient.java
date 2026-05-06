@@ -112,6 +112,25 @@ public class TmdbClient {
         return response;
     }
 
+    public String buscarDiretor(Long movieId) {
+        log.debug("TMDB: Buscando diretor para movieId={}", movieId);
+        CreditsResponse response =
+                restClient
+                        .get()
+                        .uri("/movie/{id}/credits", movieId)
+                        .retrieve()
+                        .body(CreditsResponse.class);
+        if (response == null || response.crew() == null) {
+            log.warn("TMDB: Créditos não encontrados para movieId={}", movieId);
+            return null;
+        }
+        return response.crew().stream()
+                .filter(member -> "Director".equals(member.job()))
+                .map(CrewRecord::name)
+                .findFirst()
+                .orElse(null);
+    }
+
     /** Busca a lista de elenco (Cast). [cite: 36] */
     public List<CastRecord> buscarElenco(Long movieId) {
         log.debug("TMDB: Buscando elenco movieId={}", movieId);
