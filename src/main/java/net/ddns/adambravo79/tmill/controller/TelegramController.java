@@ -413,12 +413,13 @@ public class TelegramController implements LongPollingUpdateConsumer {
         String duracaoFormatada = String.format("%dmin e %ds", minutos, segundos);
         String silasCastHint = (durationSeconds > 300) ? ", praticamente um SilasCast 🗣" : "";
 
+        // 🔥 HTML em vez de MarkdownV2 – não precisa escapar '!'
         String mensagem =
                 String.format(
-                        "🎧 Áudio recebido de *%s*, com ⌛%s%s! \n\n"
+                        "🎧 Áudio recebido de <b>%s</b>, com ⌛%s%s! \n\n"
                             + "Clique num botão abaixo para receber a transcrição 📝 desejada no"
                             + " seu chat privado 💬.",
-                        escapeMarkdown(senderName), duracaoFormatada, silasCastHint);
+                        escapeHtml(senderName), duracaoFormatada, silasCastHint);
 
         InlineKeyboardMarkup markup =
                 InlineKeyboardMarkup.builder()
@@ -435,7 +436,8 @@ public class TelegramController implements LongPollingUpdateConsumer {
                                                         .build())))
                         .build();
 
-        telegramFacade.enviarComBotoes(groupId, mensagem, markup);
+        // Usar o método HTML do facade
+        telegramFacade.enviarComBotoesHtml(groupId, mensagem, markup);
     }
 
     // =========================
