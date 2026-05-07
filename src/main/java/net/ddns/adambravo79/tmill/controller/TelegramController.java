@@ -360,6 +360,7 @@ public class TelegramController implements LongPollingUpdateConsumer {
         }
 
         // Comportamento original para chat privado
+        // Comportamento original para chat privado
         long userId = message.getFrom().getId();
         boolean isOwner = userId == ownerId;
 
@@ -374,18 +375,24 @@ public class TelegramController implements LongPollingUpdateConsumer {
                             chatId,
                             texto.length(),
                             isUltima);
+
+                    // 🔥 Mudança: usar texto plano (sem parseMode) para evitar escapes
                     if (texto.length() > telegramMessageLimit) {
                         dividirMensagem(texto, telegramMessageLimit).stream()
-                                .map(this::fecharMarkdown)
-                                .forEach(parte -> telegramFacade.enviarMensagem(chatId, parte));
+                                .forEach(
+                                        parte ->
+                                                telegramFacade.enviarMensagemSemMarkdown(
+                                                        chatId, parte));
                         return;
                     }
 
                     if (Boolean.TRUE.equals(isUltima) && isOwner) {
                         log.info("📝 Enviando resposta com botões Blogger chatId={}", chatId);
-                        enviarRespostaComBotoesBlogger(chatId, texto);
+                        // 🔥 Enviar em HTML (já que pode ter formatação simples)
+                        enviarRespostaComBotoesBloggerHtml(chatId, texto);
                     } else {
-                        telegramFacade.enviarMensagem(chatId, texto);
+                        // 🔥 Usar texto plano para a transcrição bruta ou refinada (não owner)
+                        telegramFacade.enviarMensagemSemMarkdown(chatId, texto);
                     }
                 });
     }
@@ -393,6 +400,27 @@ public class TelegramController implements LongPollingUpdateConsumer {
     private boolean isGroupChat(Message message) {
         var chat = message.getChat();
         return chat.isGroupChat() || chat.isSuperGroupChat() || chat.isChannelChat();
+    }
+
+    private void enviarRespostaComBotoesBloggerHtml(long chatId, String texto) {
+        cache.salvar(chatId, texto);
+        InlineKeyboardMarkup markup =
+                InlineKeyboardMarkup.builder()
+                        .keyboard(
+                                List.of(
+                                        new InlineKeyboardRow(
+                                                InlineKeyboardButton.builder()
+                                                        .text("📝 Publicar")
+                                                        .callbackData("blogger:publicar")
+                                                        .build(),
+                                                InlineKeyboardButton.builder()
+                                                        .text("❌ Cancelar")
+                                                        .callbackData("blogger:cancelar")
+                                                        .build())))
+                        .build();
+        // 🔥 Usar HTML – o texto refinado pode conter pontuação especial, mas HTML não requer
+        // escape
+        telegramFacade.enviarComBotoesHtml(chatId, texto, markup);
     }
 
     private void enviarBotoesTranscricaoEmGrupo(
@@ -413,12 +441,13 @@ public class TelegramController implements LongPollingUpdateConsumer {
         String duracaoFormatada = String.format("%dmin e %ds", minutos, segundos);
         String silasCastHint = (durationSeconds > 300) ? ", praticamente um SilasCast 🗣" : "";
 
+        // 🔥 HTML em vez de MarkdownV2 – não precisa escapar '!'
         String mensagem =
                 String.format(
-                        "🎧 Áudio recebido de *%s*, com ⌛%s%s! \n\n"
+                        "🎧 Áudio recebido de <b>%s</b>, com ⌛%s%s! \n\n"
                             + "Clique num botão abaixo para receber a transcrição 📝 desejada no"
                             + " seu chat privado 💬.",
-                        escapeMarkdown(senderName), duracaoFormatada, silasCastHint);
+                        escapeHtml(senderName), duracaoFormatada, silasCastHint);
 
         InlineKeyboardMarkup markup =
                 InlineKeyboardMarkup.builder()
@@ -435,7 +464,8 @@ public class TelegramController implements LongPollingUpdateConsumer {
                                                         .build())))
                         .build();
 
-        telegramFacade.enviarComBotoes(groupId, mensagem, markup);
+        // Usar o método HTML do facade
+        telegramFacade.enviarComBotoesHtml(groupId, mensagem, markup);
     }
 
     // =========================
