@@ -26,6 +26,8 @@ import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.ddns.adambravo79.tmill.cache.TranscricaoCache;
+import net.ddns.adambravo79.tmill.cache.TranscriptionCacheEntry;
+import net.ddns.adambravo79.tmill.cache.TranscriptionCacheService;
 import net.ddns.adambravo79.tmill.client.BloggerClient;
 import net.ddns.adambravo79.tmill.dto.AudioRequest;
 import net.ddns.adambravo79.tmill.exception.MovieNotFoundException;
@@ -49,6 +51,9 @@ public class TelegramController implements LongPollingUpdateConsumer {
     private final TelegramSafeExecutor safeExecutor;
     private final UserInteractionLogger userLogger;
     private final IdeasLogger ideasLogger;
+    private final MessageStoreService messageStoreService;
+    private final TranscriptStoreService transcriptStoreService;
+    private final TranscriptionCacheService transcriptionCacheService;
 
     @Value("${t1000.features.transcription-enabled:false}")
     private boolean transcriptionEnabled;
@@ -181,6 +186,16 @@ public class TelegramController implements LongPollingUpdateConsumer {
             return;
         }
 
+        // Dentro de tratarTexto, após o /start e antes de processar comandos, salve a mensagem:
+        if (!texto.startsWith("t1000") && !texto.startsWith("/start")) {
+            String userName =
+                    message.getFrom().getFirstName()
+                            + (message.getFrom().getLastName() != null
+                                    ? " " + message.getFrom().getLastName()
+                                    : "");
+            messageStoreService.saveMessage(chatId, message.getFrom().getId(), userName, texto);
+        }
+
         if (texto.startsWith("t1000 anotar ideia")) {
             String idea = texto.replace("t1000 anotar ideia", "").trim();
             if (idea.isEmpty()) {
@@ -298,7 +313,6 @@ public class TelegramController implements LongPollingUpdateConsumer {
     // =========================
     // 🎙️ AUDIO
     // =========================
-
     private void tratarFluxoAudio(Message message, long chatId) {
         if (!transcriptionEnabled) {
             log.warn("⚠️ Transcrição desativada chatId={}", chatId);
@@ -339,59 +353,145 @@ public class TelegramController implements LongPollingUpdateConsumer {
 
         boolean isGroup = isGroupChat(message);
 
+        // ========== GRUPO: pré‑processamento em background ==========
         if (isGroup) {
-            long senderId = message.getFrom().getId();
-            String senderName = message.getFrom().getFirstName();
-            if (message.getFrom().getLastName() != null) {
-                senderName += " " + message.getFrom().getLastName();
-            }
-            int duration =
+            final long senderId = message.getFrom().getId();
+            final String firstName = message.getFrom().getFirstName();
+            final String lastName = message.getFrom().getLastName();
+            final String senderName = firstName + (lastName != null ? " " + lastName : "");
+            final int duration =
                     message.hasVoice()
                             ? message.getVoice().getDuration()
                             : message.getAudio().getDuration();
+            final long fixedChatId = chatId;
+            final String fixedFileId = fileId;
+
             log.info(
                     "🎙️ Áudio recebido em grupo chatId={} fileId={} de {} duração={}s",
-                    chatId,
-                    fileId,
+                    fixedChatId,
+                    fixedFileId,
                     senderName,
                     duration);
-            enviarBotoesTranscricaoEmGrupo(chatId, fileId, senderName, senderId, duration);
+
+            // Processa em background (baixa, converte, transcreve, refina)
+            CompletableFuture.supplyAsync(() -> fileService.baixarArquivo(fixedFileId))
+                    .thenCompose(
+                            audioFile ->
+                                    audioService.processarEArmazenar(
+                                            audioFile, fixedChatId, senderId, senderName))
+                    .whenComplete(
+                            (result, ex) -> {
+                                if (ex == null && result != null) {
+                                    // Armazena no cache
+                                    transcriptionCacheService.put(
+                                            fixedFileId, result.bruto(), result.refinado());
+
+                                    // Salva refinado no banco para o digest
+                                    transcriptStoreService.saveTranscriptWithRaw(
+                                            fixedChatId,
+                                            senderId,
+                                            senderName,
+                                            result.bruto(),
+                                            result.refinado());
+
+                                    // Gera token curto
+                                    String token =
+                                            Long.toHexString(System.nanoTime())
+                                                    + Integer.toHexString(
+                                                            fixedFileId.hashCode() & 0xFFFF);
+                                    if (token.length() > 20) token = token.substring(0, 20);
+                                    pendingGroupAudio.put(
+                                            token,
+                                            new AudioRequest(
+                                                    fixedFileId,
+                                                    fixedChatId,
+                                                    System.currentTimeMillis(),
+                                                    senderId,
+                                                    senderName));
+
+                                    // Prepara mensagem com botões
+                                    long minutos = duration / 60;
+                                    long segundos = duration % 60;
+                                    String duracaoFormatada =
+                                            String.format("%dmin e %ds", minutos, segundos);
+                                    String silasCastHint =
+                                            (duration > 300)
+                                                    ? ", praticamente um SilasCast 🗣"
+                                                    : "";
+                                    String mensagemBotoes =
+                                            String.format(
+                                                    "🎧 Áudio de <b>%s</b> (%s%s) processado!\n\n"
+                                                            + "Clique num botão para receber a"
+                                                            + " transcrição no seu privado:",
+                                                    escapeHtml(senderName),
+                                                    duracaoFormatada,
+                                                    silasCastHint);
+
+                                    InlineKeyboardMarkup markup =
+                                            InlineKeyboardMarkup.builder()
+                                                    .keyboard(
+                                                            List.of(
+                                                                    new InlineKeyboardRow(
+                                                                            InlineKeyboardButton
+                                                                                    .builder()
+                                                                                    .text(
+                                                                                            "🎙️ Transcrição"
+                                                                                                + " Bruta")
+                                                                                    .callbackData(
+                                                                                            "trans_bruto|"
+                                                                                                    + token)
+                                                                                    .build(),
+                                                                            InlineKeyboardButton
+                                                                                    .builder()
+                                                                                    .text(
+                                                                                            "✨ Transcrição"
+                                                                                                + " Refinada")
+                                                                                    .callbackData(
+                                                                                            "trans_refinado|"
+                                                                                                    + token)
+                                                                                    .build())))
+                                                    .build();
+
+                                    // Envia a mensagem com botões (agora que o processamento
+                                    // terminou)
+                                    telegramFacade.enviarComBotoesHtml(
+                                            fixedChatId, mensagemBotoes, markup);
+                                } else {
+                                    log.error("Falha no pré‑processamento do áudio", ex);
+                                    telegramFacade.enviarMensagem(
+                                            fixedChatId,
+                                            "❌ Erro ao processar o áudio. Tente novamente.");
+                                }
+                            });
             return;
         }
 
-        // Comportamento original para chat privado
-        // Comportamento original para chat privado
+        // ========== CHAT PRIVADO: comportamento original (processamento imediato) ==========
         long userId = message.getFrom().getId();
         boolean isOwner = userId == ownerId;
 
         File file = fileService.baixarArquivo(fileId);
+        String userName = message.getFrom().getFirstName();
+        if (message.getFrom().getLastName() != null)
+            userName += " " + message.getFrom().getLastName();
 
         audioService.processarFluxoAudio(
                 file,
                 chatId,
+                userId,
+                userName,
                 (texto, isUltima) -> {
-                    log.debug(
-                            "📄 Texto transcrito chatId={} size={} ultima={}",
-                            chatId,
-                            texto.length(),
-                            isUltima);
-
-                    // 🔥 Mudança: usar texto plano (sem parseMode) para evitar escapes
                     if (texto.length() > telegramMessageLimit) {
-                        dividirMensagem(texto, telegramMessageLimit).stream()
+                        dividirMensagem(texto, telegramMessageLimit)
                                 .forEach(
                                         parte ->
                                                 telegramFacade.enviarMensagemSemMarkdown(
                                                         chatId, parte));
                         return;
                     }
-
-                    if (Boolean.TRUE.equals(isUltima) && isOwner) {
-                        log.info("📝 Enviando resposta com botões Blogger chatId={}", chatId);
-                        // 🔥 Enviar em HTML (já que pode ter formatação simples)
+                    if (isUltima && isOwner) {
                         enviarRespostaComBotoesBloggerHtml(chatId, texto);
                     } else {
-                        // 🔥 Usar texto plano para a transcrição bruta ou refinada (não owner)
                         telegramFacade.enviarMensagemSemMarkdown(chatId, texto);
                     }
                 });
@@ -550,6 +650,24 @@ public class TelegramController implements LongPollingUpdateConsumer {
             return;
         }
 
+        // Dentro de tratarCallbackTranscricaoComToken, após obter request e antes de processar
+        String fileId = request.fileId();
+        TranscriptionCacheEntry cached = transcriptionCacheService.get(fileId);
+        if (cached != null) {
+            // Cache hit: envia o resultado imediatamente (sem chamar Groq)
+            String textoEscolhido =
+                    "trans_bruto".equals(tipo) ? cached.getTextoBruto() : cached.getTextoRefinado();
+            String prefixo =
+                    tipo.equals("trans_bruto")
+                            ? "🎙️ Transcrição Bruta:\n"
+                            : "✨ Transcrição Refinada:\n";
+            String mensagem = prefixo + textoEscolhido;
+            // ... enviar mensagem (igual ao fluxo normal)
+            telegramFacade.enviarMensagemSemMarkdown(userId, mensagem);
+            log.info("✅ Transcrição entregue via cache para userId={} tipo={}", userId, tipo);
+            return;
+        }
+
         log.info(
                 "📊 Clique no botão {} | clicador={} (id={}) | áudio enviado por: {} (id={}) |"
                         + " chatId={} | token={}",
@@ -561,7 +679,6 @@ public class TelegramController implements LongPollingUpdateConsumer {
                 chatId,
                 token);
 
-        String fileId = request.fileId();
         long groupId = request.groupId();
 
         telegramFacade.answerCallbackQuery(
@@ -575,7 +692,9 @@ public class TelegramController implements LongPollingUpdateConsumer {
 
                         audioService.processarFluxoAudio(
                                 audioFile,
-                                userId,
+                                request.groupId(),
+                                request.senderId(),
+                                request.senderName(),
                                 (texto, isUltima) -> {
                                     if ("trans_bruto".equals(tipo) && !isUltima)
                                         resultado[0] = texto;
