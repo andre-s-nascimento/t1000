@@ -7,7 +7,7 @@ import lombok.Data;
 @Data
 @AllArgsConstructor
 public class TranscriptionCacheEntry {
-  private String textoBruto;
-  private String textoRefinado;
-  private long timestamp;
+    private String textoBruto;
+    private String textoRefinado;
+    private long timestamp;
 }
