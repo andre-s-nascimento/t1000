@@ -738,10 +738,16 @@ public class TelegramController implements LongPollingUpdateConsumer {
                             String warnKey = groupId + "_" + userId;
                             if (warnedUsersFor403.add(warnKey)) {
                                 try {
+                                    User from = callback.getFrom();
+                                    String userDisplayName = from.getFirstName();
+                                    if (from.getLastName() != null
+                                            && !from.getLastName().isBlank()) {
+                                        userDisplayName += " " + from.getLastName();
+                                    }
                                     String userMention =
-                                            callback.getFrom().getUserName() != null
-                                                    ? "@" + callback.getFrom().getUserName()
-                                                    : "Usuário";
+                                            from.getUserName() != null
+                                                    ? "@" + from.getUserName()
+                                                    : userDisplayName;
                                     telegramFacade.enviarMensagem(
                                             groupId,
                                             "⚠️ "
