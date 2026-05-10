@@ -524,51 +524,6 @@ public class TelegramController implements LongPollingUpdateConsumer {
         telegramFacade.enviarComBotoesHtml(chatId, texto, markup);
     }
 
-    private void enviarBotoesTranscricaoEmGrupo(
-            long groupId, String fileId, String senderName, long senderId, int durationSeconds) {
-        // Gera token curto
-        String token =
-                Long.toHexString(System.nanoTime())
-                        + Integer.toHexString(fileId.hashCode() & 0xFFFF);
-        if (token.length() > 20) token = token.substring(0, 20);
-
-        pendingGroupAudio.put(
-                token,
-                new AudioRequest(
-                        fileId, groupId, System.currentTimeMillis(), senderId, senderName));
-
-        long minutos = durationSeconds / 60;
-        long segundos = durationSeconds % 60;
-        String duracaoFormatada = String.format("%dmin e %ds", minutos, segundos);
-        String silasCastHint = (durationSeconds > 300) ? ", praticamente um SilasCast 🗣" : "";
-
-        // 🔥 HTML em vez de MarkdownV2 – não precisa escapar '!'
-        String mensagem =
-                String.format(
-                        "🎧 Áudio recebido de <b>%s</b>, com ⌛%s%s! \n\n"
-                            + "Clique num botão abaixo para receber a transcrição 📝 desejada no"
-                            + " seu chat privado 💬.",
-                        escapeHtml(senderName), duracaoFormatada, silasCastHint);
-
-        InlineKeyboardMarkup markup =
-                InlineKeyboardMarkup.builder()
-                        .keyboard(
-                                List.of(
-                                        new InlineKeyboardRow(
-                                                InlineKeyboardButton.builder()
-                                                        .text("🎙️ Transcrição Bruta")
-                                                        .callbackData("trans_bruto|" + token)
-                                                        .build(),
-                                                InlineKeyboardButton.builder()
-                                                        .text("✨ Transcrição Refinada")
-                                                        .callbackData("trans_refinado|" + token)
-                                                        .build())))
-                        .build();
-
-        // Usar o método HTML do facade
-        telegramFacade.enviarComBotoesHtml(groupId, mensagem, markup);
-    }
-
     // =========================
     // 🔘 CALLBACK
     // =========================
@@ -785,10 +740,6 @@ public class TelegramController implements LongPollingUpdateConsumer {
                 });
     }
 
-    private void editarMensagemGrupo(long chatId, int messageId, String novoTexto) {
-        telegramFacade.editarMensagem(chatId, messageId, novoTexto);
-    }
-
     private void enviarOpcoesDesambiguacao(long chatId, List<MovieRecord> resultados) {
         List<InlineKeyboardRow> rows = new ArrayList<>();
         InlineKeyboardRow current = new InlineKeyboardRow();
@@ -813,45 +764,6 @@ public class TelegramController implements LongPollingUpdateConsumer {
                 chatId, "🧐 Encontrei vários resultados. Qual você quer?", markup);
     }
 
-    private void enviarRespostaComBotoesBlogger(long chatId, String texto) {
-        cache.salvar(chatId, texto);
-        InlineKeyboardMarkup markup =
-                InlineKeyboardMarkup.builder()
-                        .keyboard(
-                                List.of(
-                                        new InlineKeyboardRow(
-                                                InlineKeyboardButton.builder()
-                                                        .text("📝 Publicar")
-                                                        .callbackData("blogger:publicar")
-                                                        .build(),
-                                                InlineKeyboardButton.builder()
-                                                        .text("❌ Cancelar")
-                                                        .callbackData("blogger:cancelar")
-                                                        .build())))
-                        .build();
-        telegramFacade.enviarComBotoes(chatId, texto, markup);
-    }
-
-    private String escapeMarkdown(String text) {
-        return text.replace("_", "\\_")
-                .replace("*", "\\*")
-                .replace("[", "\\[")
-                .replace("]", "\\]")
-                .replace("(", "\\(")
-                .replace(")", "\\)")
-                .replace("~", "\\~")
-                .replace("`", "\\`")
-                .replace(">", "\\>")
-                .replace("#", "\\#")
-                .replace("+", "\\+")
-                .replace("-", "\\-")
-                .replace("=", "\\=")
-                .replace("{", "\\{")
-                .replace("}", "\\}")
-                .replace(".", "\\.")
-                .replace("!", "\\!");
-    }
-
     private List<String> dividirMensagem(String texto, int limite) {
         List<String> partes = new ArrayList<>();
         while (texto.length() > limite) {
@@ -862,11 +774,6 @@ public class TelegramController implements LongPollingUpdateConsumer {
         }
         if (!texto.isEmpty()) partes.add(texto);
         return partes;
-    }
-
-    private String fecharMarkdown(String texto) {
-        long count = texto.chars().filter(c -> c == '*').count();
-        return (count % 2 != 0) ? texto + "*" : texto;
     }
 
     private String escapeHtml(String text) {
