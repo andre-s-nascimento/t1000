@@ -149,16 +149,22 @@ public class TelegramController implements LongPollingUpdateConsumer {
 
         if (update.hasCallbackQuery()) {
             var callback = update.getCallbackQuery();
-            var from = callback != null ? callback.getFrom() : null;
+
+            if (callback == null || callback.getMessage() == null) {
+                log.warn("⚠️ CallbackQuery ou message nulo, ignorando update");
+                return;
+            }
+
+            var from = callback.getFrom();
             if (from != null) {
                 userLogger.logUser(
-                        from.getId(),
-                        from.getFirstName()
-                                + (from.getLastName() != null ? " " + from.getLastName() : ""),
-                        "callback:" + callback.getData());
+                        from.getId(), buildFullName(from), "callback:" + callback.getData());
             }
+
             long cbChatId = callback.getMessage().getChatId();
+
             log.info("🔘 Callback recebido chatId={} data={}", cbChatId, callback.getData());
+
             safeExecutor.run(
                     cbChatId, telegramFacade::enviarMensagem, () -> tratarCallback(callback));
             return;
@@ -195,11 +201,7 @@ public class TelegramController implements LongPollingUpdateConsumer {
 
         // Dentro de tratarTexto, após o /start e antes de processar comandos, salve a mensagem:
         if (!texto.startsWith("t1000") && !texto.startsWith("/start")) {
-            String userName =
-                    message.getFrom().getFirstName()
-                            + (message.getFrom().getLastName() != null
-                                    ? " " + message.getFrom().getLastName()
-                                    : "");
+            String userName = buildFullName(message.getFrom());
             messageStoreService.saveMessage(chatId, message.getFrom().getId(), userName, texto);
         }
 
@@ -365,9 +367,7 @@ public class TelegramController implements LongPollingUpdateConsumer {
         // ========== GRUPO: pré‑processamento em background ==========
         if (isGroup) {
             final long senderId = message.getFrom().getId();
-            final String firstName = message.getFrom().getFirstName();
-            final String lastName = message.getFrom().getLastName();
-            final String senderName = firstName + (lastName != null ? " " + lastName : "");
+            final String senderName = buildFullName(message.getFrom());
             final int duration =
                     message.hasVoice()
                             ? message.getVoice().getDuration()
@@ -707,11 +707,7 @@ public class TelegramController implements LongPollingUpdateConsumer {
                             if (warnedUsersFor403.add(warnKey)) {
                                 try {
                                     User from = callback.getFrom();
-                                    String userDisplayName = from.getFirstName();
-                                    if (from.getLastName() != null
-                                            && !from.getLastName().isBlank()) {
-                                        userDisplayName += " " + from.getLastName();
-                                    }
+                                    String userDisplayName = buildFullName(from);
                                     String userMention =
                                             from.getUserName() != null
                                                     ? "@" + from.getUserName()
@@ -795,5 +791,13 @@ public class TelegramController implements LongPollingUpdateConsumer {
                 .replace(">", "&gt;")
                 .replace("\"", "&quot;")
                 .replace("'", "&#39;");
+    }
+
+    private String buildFullName(User user) {
+        if (user == null) return "";
+        String lastName = user.getLastName();
+        return lastName != null && !lastName.isBlank()
+                ? user.getFirstName() + " " + lastName
+                : user.getFirstName();
     }
 }
