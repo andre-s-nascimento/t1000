@@ -230,20 +230,22 @@ public class TelegramController implements LongPollingUpdateConsumer {
             ideasLogger.saveIdea(userId, userName, chatId, idea, chatName);
 
             String adminMsg =
-                    String.format(
-                            "💡 <b>Nova ideia</b>\n"
-                                    + "📝 <i>%s</i>\n"
-                                    + "👤 <b>Usuário:</b> <a href=\"tg://user?id=%d\">%s</a>\n"
-                                    + "📍 <b>Local:</b> %s\n"
-                                    + "🕒 %s",
-                            escapeHtml(idea),
-                            userId,
-                            escapeHtml(userName),
-                            escapeHtml(chatName),
-                            java.time.LocalDateTime.now()
-                                    .format(
-                                            java.time.format.DateTimeFormatter.ofPattern(
-                                                    "dd/MM/yyyy HH:mm:ss")));
+                    """
+          💡 <b>Nova ideia</b>
+          📝 <i>%s</i>
+          👤 <b>Usuário:</b> <a href="tg://user?id=%d">%s</a>
+          📍 <b>Local:</b> %s
+          🕒 %s
+          """
+                            .formatted(
+                                    escapeHtml(idea),
+                                    userId,
+                                    escapeHtml(userName),
+                                    escapeHtml(chatName),
+                                    java.time.LocalDateTime.now()
+                                            .format(
+                                                    java.time.format.DateTimeFormatter.ofPattern(
+                                                            "dd/MM/yyyy HH:mm:ss")));
             telegramFacade.enviarMensagemHtml(ownerId, adminMsg);
             telegramFacade.enviarMensagemHtml(
                     chatId, "✅ Ideia registrada! Obrigado pela contribuição.");
@@ -426,13 +428,15 @@ public class TelegramController implements LongPollingUpdateConsumer {
                                                     ? ", praticamente um SilasCast 🗣"
                                                     : "";
                                     String mensagemBotoes =
-                                            String.format(
-                                                    "🎧 Áudio de <b>%s</b> (%s%s) processado!\n\n"
-                                                            + "Clique num botão para receber a"
-                                                            + " transcrição no seu privado:",
-                                                    escapeHtml(senderName),
-                                                    duracaoFormatada,
-                                                    silasCastHint);
+                                            """
+                      🎧 Áudio de <b>%s</b> (%s) processado!
+
+                      Clique num botão para receber a transcrição no seu privado:
+                      """
+                                                    .formatted(
+                                                            escapeHtml(senderName),
+                                                            duracaoFormatada,
+                                                            silasCastHint);
 
                                     InlineKeyboardMarkup markup =
                                             InlineKeyboardMarkup.builder()
