@@ -1,4 +1,4 @@
-/* (c) 2026 | 06/05/2026 */
+/* (c) 2026 | 11/05/2026 */
 package net.ddns.adambravo79.tmill.service;
 
 import java.util.Optional;
@@ -89,10 +89,6 @@ public class MovieService {
 
         // Diretor (apenas nome, sem link)
         String diretor = tmdbClient.buscarDiretor(id);
-        String directorLine =
-                (diretor != null && !diretor.isBlank())
-                        ? "🎬 *Diretor:* " + diretor + "\n"
-                        : "\n"; // se não houver diretor, deixa uma linha em branco
 
         var streamings = tmdbClient.buscarOndeAssistir(id);
 

@@ -1,4 +1,4 @@
-/* (c) 2026 | 02/05/2026 */
+/* (c) 2026 | 13/05/2026 */
 package net.ddns.adambravo79.tmill.client;
 
 import java.io.File;
@@ -15,38 +15,54 @@ import org.springframework.web.client.RestClient;
 import lombok.extern.slf4j.Slf4j;
 import net.ddns.adambravo79.tmill.model.ChatCompletionResponse;
 import net.ddns.adambravo79.tmill.model.TranscriptionResponse;
+import net.ddns.adambravo79.tmill.prompt.DigestPersona;
+import net.ddns.adambravo79.tmill.prompt.DigestPromptFactory;
 
 @Slf4j
 @Component
 public class GroqClient {
 
+    private static final String MODEL = "model";
+    private static final String CONTENT = "content";
+
     private final RestClient restClient;
-    private final int maxRefinementLength;
+    private final DigestPromptFactory promptFactory;
+    private final int maxPromptLength;
 
     @Autowired
     public GroqClient(
             @Value("${groq.api.key}") String apiKey,
-            @Value("${groq.max-refinement-length:10000}") int maxRefinementLength) {
+            @Value("${groq.max-prompt-length:32000}") int maxPromptLength,
+            DigestPromptFactory promptFactory) {
+
         this.restClient =
                 RestClient.builder()
                         .baseUrl("https://api.groq.com")
                         .defaultHeader("Authorization", "Bearer " + apiKey)
                         .build();
-        this.maxRefinementLength = maxRefinementLength;
+
+        this.maxPromptLength = maxPromptLength;
+        this.promptFactory = promptFactory;
     }
 
-    // Construtor para testes
-    public GroqClient(RestClient restClient, int maxRefinementLength) {
+    // construtor para testes
+    public GroqClient(
+            RestClient restClient, int maxPromptLength, DigestPromptFactory promptFactory) {
+
         this.restClient = restClient;
-        this.maxRefinementLength = maxRefinementLength;
+        this.promptFactory = promptFactory;
+        this.maxPromptLength = maxPromptLength;
     }
 
     public String transcrever(File wavFile) {
-        log.info("🎙️ Iniciando transcrição via Groq (Whisper) para arquivo={}", wavFile.getName());
+
+        log.info("🎙️ Transcrevendo arquivo={}", wavFile.getName());
 
         MultipartBodyBuilder builder = new MultipartBodyBuilder();
+
         builder.part("file", new org.springframework.core.io.FileSystemResource(wavFile));
-        builder.part("model", "whisper-large-v3");
+
+        builder.part(MODEL, "whisper-large-v3");
 
         TranscriptionResponse response =
                 restClient
@@ -58,47 +74,44 @@ public class GroqClient {
                         .body(TranscriptionResponse.class);
 
         if (response == null || response.text() == null) {
-            log.error("❌ Groq: resposta inválida na transcrição arquivo={}", wavFile.getName());
-            throw new IllegalStateException("Falha na transcrição — resposta inválida");
+
+            throw new IllegalStateException("Falha na transcrição.");
         }
 
-        log.info(
-                "✅ Transcrição concluída arquivo={} textoSize={}",
-                wavFile.getName(),
-                response.text().length());
         return response.text();
     }
 
-    public String refinarTexto(String textoBruto) {
-        // Se ultrapassar o limite configurável, retorna o bruto com aviso (não lança exceção)
-        if (textoBruto.length() > maxRefinementLength) {
-            log.warn(
-                    "⚠️ Texto muito longo para refinamento automático size={} (limite={})",
-                    textoBruto.length(),
-                    maxRefinementLength);
-            return "⚠️ *Aviso:* O texto excede o limite para refinamento (máx. "
-                    + maxRefinementLength
-                    + " caracteres). Segue a versão bruta:\n\n"
-                    + textoBruto;
-        }
+    public String chatCompletion(
+            String systemPrompt,
+            String userPrompt,
+            String model,
+            double temperature,
+            int maxTokens) {
 
-        log.debug("✨ Refinando texto via Llama 3.1 size={}", textoBruto.length());
+        systemPrompt = systemPrompt == null ? "" : systemPrompt;
+        userPrompt = userPrompt == null ? "" : userPrompt;
+
+        int totalSize = systemPrompt.length() + userPrompt.length();
+
+        log.info("🤖 ChatCompletion model={} size={}", model, totalSize);
+
+        if (totalSize > maxPromptLength) {
+
+            log.warn("⚠️ Prompt acima do limite size={} limit={}", totalSize, maxPromptLength);
+        }
 
         var payload =
                 Map.of(
-                        "model",
-                        "llama-3.1-8b-instant",
+                        MODEL,
+                        model,
                         "messages",
                         List.of(
-                                Map.of(
-                                        "role",
-                                        "system",
-                                        "content",
-                                        "Corrija a pontuação e remova vícios de fala. Retorne"
-                                                + " apenas o texto limpo."),
-                                Map.of("role", "user", "content", textoBruto)),
+                                Map.of("role", "system", CONTENT, systemPrompt),
+                                Map.of("role", "user", CONTENT, userPrompt)),
                         "temperature",
-                        0.3);
+                        temperature,
+                        "max_tokens",
+                        maxTokens);
 
         ChatCompletionResponse response =
                 restClient
@@ -110,16 +123,44 @@ public class GroqClient {
                         .body(ChatCompletionResponse.class);
 
         if (response == null || response.choices().isEmpty()) {
-            log.error("❌ Groq: resposta inválida no refinamento textoSize={}", textoBruto.length());
-            // Fallback: retorna o texto bruto
-            return textoBruto;
+
+            throw new IllegalStateException("Resposta inválida da Groq.");
         }
 
-        String textoRefinado = response.choices().get(0).message().content();
-        log.info(
-                "✅ Refinamento concluído textoSize={} refinadoSize={}",
-                textoBruto.length(),
-                textoRefinado.length());
-        return textoRefinado;
+        return response.choices().get(0).message().content();
+    }
+
+    public String gerarResumoDigest(String messages, DigestPersona persona) {
+
+        return chatCompletion(
+                promptFactory.buildSystemPrompt(persona),
+                promptFactory.buildUserPrompt(messages),
+                "meta-llama/llama-4-scout-17b-16e-instruct",
+                0.45,
+                1000);
+    }
+
+    public String refinarTexto(String textoBruto) {
+
+        if (textoBruto == null || textoBruto.isBlank()) {
+
+            return "";
+        }
+
+        try {
+
+            return chatCompletion(
+                    promptFactory.buildTranscriptRefinementPrompt(),
+                    textoBruto,
+                    "llama-3.1-8b-instant",
+                    0.2,
+                    1200);
+
+        } catch (Exception e) {
+
+            log.warn("⚠️ Refinamento falhou, retornando bruto.", e);
+
+            return textoBruto;
+        }
     }
 }
