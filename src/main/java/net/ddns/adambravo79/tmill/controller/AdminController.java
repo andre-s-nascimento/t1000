@@ -54,10 +54,11 @@ public class AdminController {
         return ResponseEntity.ok(transcriptionCacheService.getStats());
     }
 
-    // AdminController.java
     @GetMapping("/custom-digest")
     public ResponseEntity<String> customDigest(
-            @RequestParam("start") String startDate, @RequestParam("end") String endDate) {
+            @RequestParam("start") String startDate,
+            @RequestParam("end") String endDate,
+            @RequestParam(value = "chatId", required = false) Long chatId) {
 
         try {
             LocalDate startLocalDate = null;
@@ -69,7 +70,7 @@ public class AdminController {
                     DateTimeFormatter formatter = DateTimeFormatter.ofPattern(pattern);
                     startLocalDate = LocalDate.parse(startDate, formatter);
                     endLocalDate = LocalDate.parse(endDate, formatter);
-                    break; // saiu do loop, conseguiu parsear
+                    break;
                 } catch (DateTimeParseException ignored) {
                     /** */
                 }
@@ -86,9 +87,18 @@ public class AdminController {
             LocalDateTime from = startLocalDate.atStartOfDay(zone).toLocalDateTime(); // 00:00
             LocalDateTime to = endLocalDate.atTime(23, 59, 59); // 23:59:59
 
-            dailyDigestService.generateDigestCustom(from, to);
-            return ResponseEntity.ok(
-                    "Resumo personalizado gerado para período: " + startDate + " até " + endDate);
+            // Gera o resumo, enviando para o chat específico (ou para todos se chatId for null)
+            dailyDigestService.generateDigestCustom(from, to, chatId);
+
+            String message =
+                    "Resumo personalizado gerado para período: " + startDate + " até " + endDate;
+            if (chatId != null) {
+                message += " (enviado apenas para o chat " + chatId + ")";
+            } else {
+                message += " (enviado para todos os chats configurados)";
+            }
+            return ResponseEntity.ok(message);
+
         } catch (Exception e) {
             log.error("Erro ao processar datas", e);
             return ResponseEntity.internalServerError().body("Erro interno: " + e.getMessage());

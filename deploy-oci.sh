@@ -83,6 +83,9 @@ run_container() {
     mkdir -p "$DATA_PATH"
     mkdir -p "$(pwd)/logs"
     chmod 777 "$(pwd)/logs"
+    # Garante permissões corretas para o banco
+    sudo chown -R 1000:1000 data 2>/dev/null || true
+    sudo chmod 666 data/t1000.db 2>/dev/null || true
 
     docker run -d \
         --name "$APP_NAME" \
