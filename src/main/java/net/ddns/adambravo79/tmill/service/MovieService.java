@@ -1,8 +1,9 @@
 /* (c) 2026 | 15/05/2026 */
 package net.ddns.adambravo79.tmill.service;
 
+import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
+import java.util.concurrent.CompletableFuture;
 
 import org.springframework.stereotype.Service;
 
@@ -11,6 +12,7 @@ import net.ddns.adambravo79.tmill.client.TmdbClient;
 import net.ddns.adambravo79.tmill.exception.MovieNotFoundException;
 import net.ddns.adambravo79.tmill.model.CastRecord;
 import net.ddns.adambravo79.tmill.model.MovieOrchestrationResponse;
+import net.ddns.adambravo79.tmill.model.MovieRecord;
 import net.ddns.adambravo79.tmill.model.MovieSearchResponse;
 
 /**
@@ -61,36 +63,29 @@ public class MovieService {
      * @param nome título do filme.
      * @return {@link MovieOrchestrationResponse} com texto formatado e URL do poster.
      */
-    public MovieOrchestrationResponse executarBuscaFormatada(String nome) {
-        var busca = buscarFilme(nome);
-        var basico = busca.results().get(0);
-        return buscarPorId(basico.id());
-    }
-
-    /**
-     * Busca detalhes completos de um filme diretamente pelo ID no TMDB.
-     *
-     * @param id identificador único do filme no TMDB.
-     * @return {@link MovieOrchestrationResponse} com texto formatado e URL do poster.
-     * @throws MovieNotFoundException se os detalhes não forem encontrados.
-     */
     public MovieOrchestrationResponse buscarPorId(long id) {
-        var detalhes = tmdbClient.buscarDetalhes(id);
+        // Busca detalhes, elenco, diretor e provedores em paralelo
+        CompletableFuture<MovieRecord> detalhesFuture =
+                CompletableFuture.supplyAsync(() -> tmdbClient.buscarDetalhes(id));
+        CompletableFuture<List<CastRecord>> elencoFuture =
+                CompletableFuture.supplyAsync(() -> tmdbClient.buscarElenco(id));
+        CompletableFuture<String> diretorFuture =
+                CompletableFuture.supplyAsync(() -> tmdbClient.buscarDiretor(id));
+        CompletableFuture<String> streamingsFuture =
+                CompletableFuture.supplyAsync(() -> tmdbClient.buscarOndeAssistir(id));
+
+        // Aguarda todos
+        CompletableFuture.allOf(detalhesFuture, elencoFuture, diretorFuture, streamingsFuture)
+                .join();
+
+        MovieRecord detalhes = detalhesFuture.join();
         if (detalhes == null) {
             throw new MovieNotFoundException("Detalhes do filme não encontrados para ID: " + id);
         }
 
-        // Elenco (top 5)
-        var elenco =
-                tmdbClient.buscarElenco(id).stream()
-                        .limit(5)
-                        .map(CastRecord::name)
-                        .collect(Collectors.joining(", "));
-
-        // Diretor (apenas nome, sem link)
-        String diretor = tmdbClient.buscarDiretor(id);
-
-        var streamings = tmdbClient.buscarOndeAssistir(id);
+        List<CastRecord> elenco = elencoFuture.join();
+        String diretor = diretorFuture.join();
+        String streamings = streamingsFuture.join();
 
         String ano =
                 (detalhes.releaseDate() != null && detalhes.releaseDate().length() >= 4)
