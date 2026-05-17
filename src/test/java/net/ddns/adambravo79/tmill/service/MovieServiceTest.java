@@ -1,4 +1,4 @@
-/* (c) 2026 | 15/05/2026 */
+/* (c) 2026 | 17/05/2026 */
 package net.ddns.adambravo79.tmill.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -19,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import net.ddns.adambravo79.tmill.client.TmdbClient;
 import net.ddns.adambravo79.tmill.exception.MovieNotFoundException;
 import net.ddns.adambravo79.tmill.model.CastRecord;
+import net.ddns.adambravo79.tmill.model.MovieOrchestrationResponse;
 import net.ddns.adambravo79.tmill.model.MovieRecord;
 import net.ddns.adambravo79.tmill.model.MovieSearchResponse;
 
@@ -33,7 +34,6 @@ class MovieServiceTest {
     @BeforeEach
     void setUp() {
         movieService = new MovieService(tmdbClient, easterEggService);
-        // Não criar stub global – cada teste define seu próprio comportamento
     }
 
     // =========================
@@ -83,24 +83,8 @@ class MovieServiceTest {
         stubEmptyEasterEgg();
         Long id = 1L;
 
-        when(tmdbClient.pesquisarFilme("agente secreto"))
-                .thenReturn(
-                        new MovieSearchResponse(
-                                1,
-                                1,
-                                1,
-                                List.of(
-                                        new MovieRecord(
-                                                id,
-                                                "O Agente Secreto",
-                                                "The Secret Agent",
-                                                "2025-09-10",
-                                                "desc",
-                                                10.0,
-                                                8.5,
-                                                "/img",
-                                                List.of("BR")))));
-
+        // Simula a busca por nome (apenas para obter o ID, mas não usaremos executarBuscaFormatada)
+        // Vamos chamar diretamente buscarPorId
         when(tmdbClient.buscarDetalhes(id))
                 .thenReturn(
                         new MovieRecord(
@@ -117,9 +101,10 @@ class MovieServiceTest {
         when(tmdbClient.buscarElenco(id))
                 .thenReturn(List.of(new CastRecord("Wagner Moura", "Marcelo")));
 
+        when(tmdbClient.buscarDiretor(id)).thenReturn("Diretor Teste");
         when(tmdbClient.buscarOndeAssistir(id)).thenReturn("Netflix");
 
-        var result = movieService.executarBuscaFormatada("agente secreto");
+        MovieOrchestrationResponse result = movieService.buscarPorId(id);
 
         assertThat(result.textoFormatado())
                 .contains("O AGENTE SECRETO")
@@ -147,9 +132,10 @@ class MovieServiceTest {
                         List.of());
         when(tmdbClient.buscarDetalhes(1L)).thenReturn(movie);
         when(tmdbClient.buscarElenco(1L)).thenReturn(List.of());
+        when(tmdbClient.buscarDiretor(1L)).thenReturn(null);
         when(tmdbClient.buscarOndeAssistir(1L)).thenReturn("N/A");
 
-        var result = movieService.buscarPorId(1L);
+        MovieOrchestrationResponse result = movieService.buscarPorId(1L);
         assertThat(result.textoFormatado()).contains("🌐");
     }
 
@@ -161,9 +147,10 @@ class MovieServiceTest {
                 new MovieRecord(id, "Teste", "Test", null, "desc", 1.0, 1.0, "/img", List.of("US"));
         when(tmdbClient.buscarDetalhes(id)).thenReturn(movie);
         when(tmdbClient.buscarElenco(id)).thenReturn(List.of());
+        when(tmdbClient.buscarDiretor(id)).thenReturn(null);
         when(tmdbClient.buscarOndeAssistir(id)).thenReturn("N/A");
 
-        var result = movieService.buscarPorId(id);
+        MovieOrchestrationResponse result = movieService.buscarPorId(id);
         assertThat(result.textoFormatado()).contains("TBA");
     }
 
@@ -175,16 +162,17 @@ class MovieServiceTest {
                         1L, "Teste", "Test", "2020", "desc", 1.0, 1.0, "/img", List.of("XXX"));
         when(tmdbClient.buscarDetalhes(1L)).thenReturn(movie);
         when(tmdbClient.buscarElenco(1L)).thenReturn(List.of());
+        when(tmdbClient.buscarDiretor(1L)).thenReturn(null);
         when(tmdbClient.buscarOndeAssistir(1L)).thenReturn("N/A");
 
-        var result = movieService.buscarPorId(1L);
+        MovieOrchestrationResponse result = movieService.buscarPorId(1L);
         assertThat(result.textoFormatado()).contains("🌐");
     }
 
     @Test
     void deveLancarExcecaoQuandoFilmeNaoEncontrado() {
         when(tmdbClient.pesquisarFilme("xyz")).thenReturn(null);
-        assertThatThrownBy(() -> movieService.executarBuscaFormatada("xyz"))
+        assertThatThrownBy(() -> movieService.buscarFilme("xyz"))
                 .isInstanceOf(MovieNotFoundException.class)
                 .hasMessageContaining("Filme não encontrado");
     }
@@ -193,16 +181,15 @@ class MovieServiceTest {
     void deveLancarExcecaoQuandoListaVazia() {
         when(tmdbClient.pesquisarFilme("xyz"))
                 .thenReturn(new MovieSearchResponse(1, 0, 0, List.of()));
-        assertThatThrownBy(() -> movieService.executarBuscaFormatada("xyz"))
+        assertThatThrownBy(() -> movieService.buscarFilme("xyz"))
                 .isInstanceOf(MovieNotFoundException.class)
                 .hasMessageContaining("Filme não encontrado");
     }
 
     @Test
     void deveLancarExcecaoQuandoDetalhesForemNull() {
-
+        // não chame stubEmptyEasterEgg() aqui
         when(tmdbClient.buscarDetalhes(1L)).thenReturn(null);
-
         assertThatThrownBy(() -> movieService.buscarPorId(1L))
                 .isInstanceOf(MovieNotFoundException.class)
                 .hasMessageContaining("Detalhes do filme não encontrados");
