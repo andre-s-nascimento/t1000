@@ -8,42 +8,28 @@ on:
 jobs:
   create-pr:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Setup Git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Extract version from branch name
+        id: vars
+        run: |
+          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+          VERSION=$(echo "$BRANCH_NAME" | sed -E 's/^release\/v?//')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Create Pull Request to main
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
-          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
-          VERSION=$(echo "$BRANCH_NAME" | sed -E 's/^release\/v?//')
-
-          PR_TITLE="chore: release v$VERSION"
-
-          PR_BODY=$(cat <<EOF
-          ## 🧾 Descrição
-
-          Release da versão $VERSION
-
-          ## ✅ Checklist
-          - [ ] Revisão aprovada
-          EOF
-          )
-
-          EXISTING_PR=$(gh pr list \
-            --base main \
-            --head "$BRANCH_NAME" \
-            --json number \
-            --jq '.[0].number')
-
-          if [ -z "$EXISTING_PR" ]; then
-            gh pr create \
-              --base main \
-              --head "$BRANCH_NAME" \
-              --title "$PR_TITLE" \
-              --body "$PR_BODY" \
-              --label "release"
-          else
-            echo "PR already exists: https://github.com/${{ github.repository }}/pull/$EXISTING_PR"
-          fi
+          PR_TITLE="chore: release v${{ steps.vars.outputs.version }}"
+          PR_BODY="## 🧾 Descrição\n\nRelease da versão ${{ steps.vars.outputs.version }}\n\n## ✅ Checklist\n- [ ] Revisão aprovada"
+          gh pr create --base main --head "${{ github.ref_name }}" --title "$PR_TITLE" --body "$PR_BODY" --label "release" || echo "PR may already exist"
