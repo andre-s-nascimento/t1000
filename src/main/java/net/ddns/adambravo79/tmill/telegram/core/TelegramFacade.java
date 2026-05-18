@@ -28,7 +28,6 @@ import lombok.extern.slf4j.Slf4j;
 @Component
 public class TelegramFacade {
 
-    private static final String MARKDOWN = "MarkdownV2";
     private static final String HTML = "HTML";
 
     private final TelegramClient telegramClient;
