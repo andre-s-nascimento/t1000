@@ -284,19 +284,17 @@ public class TelegramFacade {
                 });
     }
 
-    // net.ddns.adambravo79.tmill.telegram.core.TelegramFacade.java
     public void enviarAnimacao(long chatId, String animationUrl, String caption) {
         safeExecutor.run(
                 chatId,
                 this::enviarFallback,
                 () -> {
-                    // Cria o objeto de animação
-                    SendAnimation animation =
+                    var animation =
                             SendAnimation.builder()
                                     .chatId(String.valueOf(chatId))
                                     .animation(new InputFile(animationUrl))
                                     .caption(caption)
-                                    .parseMode("HTML") // ou "MarkdownV2", conforme sua preferência
+                                    .parseMode("HTML")
                                     .build();
                     telegramClient.execute(animation);
                 });

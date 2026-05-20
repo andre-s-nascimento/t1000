@@ -7,7 +7,7 @@
     "animation": "https://imgs.search.brave.com/F1mVInFfgD84_WJarkrRL5WKBTKELXSGBAmyYryox5s/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly9tZWRp/YTEudGVub3IuY29t/L20vTHA5eVFRbnJn/dDRBQUFBZC94dXhh/LWFoYW0uZ2lm.gif"
   },
   "saudacao": {
-    "triggers": ["oi", "olá", "opa", "e aí", "bom dia"],
+    "triggers": ["bom dia"],
     "response": "BOOOOOM DIAAAAAA... VIEEEETNÃÃÃÃÃÃÃÃ! ☀️"
   },
   "tchau": {

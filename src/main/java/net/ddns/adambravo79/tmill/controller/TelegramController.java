@@ -218,19 +218,20 @@ public class TelegramController implements LongPollingUpdateConsumer {
                     chatId, message.getFrom().getId(), buildFullName(message.getFrom()), texto);
         }
 
+        // ========== RESPOSTAS AUTOMÁTICAS ==========
         if (!texto.startsWith("t1000") && !texto.startsWith(START)) {
             Optional<AutoResponseRule> autoResponse = autoResponseService.getResponseRule(texto);
             if (autoResponse.isPresent()) {
                 AutoResponseRule rule = autoResponse.get();
-                if (rule.getAnimation() != null && !rule.getAnimation().isEmpty()) {
-                    // Envia o GIF usando o TelegramFacade
+                if (rule.getAnimation() != null && !rule.getAnimation().isBlank()) {
                     telegramFacade.enviarAnimacao(chatId, rule.getAnimation(), rule.getResponse());
                 } else {
                     telegramFacade.enviarMensagem(chatId, rule.getResponse());
                 }
-                return;
+                return; // Impede processamento de outros comandos (opcional)
             }
         }
+        // ==========================================
 
         if (texto.startsWith("t1000 anotar ideia")) {
             tratarAnotarIdeia(message, chatId, texto);
