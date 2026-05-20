@@ -20,7 +20,7 @@
     "response": "Hasta la vista, baby! 👋😎"
   },
   "obrigado": {
-    "triggers": ["obrigado", "valeu", "obg", "obrigada"],
+    "triggers": ["obrigado", "valeu", "obg", "vlw", "obrigada"],
     "response": "Por nada! Isto fica feliz em ser útil. 🤖"
   }
 }
