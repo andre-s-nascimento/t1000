@@ -35,6 +35,18 @@ public class AdminController {
     private final WeeklyReminderService weeklyReminderService;
     private final AutoResponseService autoResponseService;
 
+    @PostMapping("/reload-auto-responses")
+    public ResponseEntity<String> reloadAutoResponses() {
+        autoResponseService.reload();
+        return ResponseEntity.ok("Respostas automáticas recarregadas");
+    }
+
+    @PostMapping("/test-weekly-reminder")
+    public ResponseEntity<String> testWeeklyReminder() {
+        weeklyReminderService.sendWednesdayReminder();
+        return ResponseEntity.ok("Lembrete semanal disparado manualmente.");
+    }
+
     @PostMapping("/reload-easter-eggs")
     public ResponseEntity<String> reloadEasterEggs() {
         easterEggService.reload();
@@ -106,17 +118,5 @@ public class AdminController {
             }
         }
         return new LocalDate[0];
-    }
-
-    @PostMapping("/test-weekly-reminder")
-    public ResponseEntity<String> testWeeklyReminder() {
-        weeklyReminderService.sendWednesdayReminder();
-        return ResponseEntity.ok("Lembrete semanal disparado manualmente.");
-    }
-
-    @PostMapping("/reload-auto-responses")
-    public ResponseEntity<String> reloadAutoResponses() {
-        autoResponseService.reload();
-        return ResponseEntity.ok("Respostas automáticas recarregadas");
     }
 }
