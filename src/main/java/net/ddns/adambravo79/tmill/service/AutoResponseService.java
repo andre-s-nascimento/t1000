@@ -1,6 +1,10 @@
 /* (c) 2026 | 20/05/2026 */
 package net.ddns.adambravo79.tmill.service;
 
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.regex.Pattern;
 
@@ -21,6 +25,8 @@ public class AutoResponseService {
 
     private final Map<String, AutoResponseRule> triggerToRule = new HashMap<>();
     private final ObjectMapper mapper = new ObjectMapper();
+    private static final ZoneId BRAZIL_ZONE = ZoneId.of("America/Sao_Paulo");
+    private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
 
     @Value("${auto.response.enabled:false}")
     private boolean enabled;
@@ -57,12 +63,23 @@ public class AutoResponseService {
                 List<String> triggers = (List<String>) entry.getValue().get("triggers");
                 String response = (String) entry.getValue().get("response");
                 String animation = (String) entry.getValue().get("animation");
+
+                // Extrai timeRange, se presente
+                LocalTime startTime = null;
+                LocalTime endTime = null;
+                Map<String, String> timeRange =
+                        (Map<String, String>) entry.getValue().get("timeRange");
+                if (timeRange != null) {
+                    startTime = LocalTime.parse(timeRange.get("start"), TIME_FORMATTER);
+                    endTime = LocalTime.parse(timeRange.get("end"), TIME_FORMATTER);
+                }
+
                 if (triggers != null && response != null) {
                     for (String trigger : triggers) {
                         if (trigger != null && !trigger.isBlank()) {
                             triggerToRule.put(
                                     trigger.toLowerCase(),
-                                    new AutoResponseRule(response, animation));
+                                    new AutoResponseRule(response, animation, startTime, endTime));
                         }
                     }
                 }
@@ -75,12 +92,23 @@ public class AutoResponseService {
         }
     }
 
-    /** Verifica se o texto contém a palavra exata (ou frase) – não substring genérica. */
     private boolean containsExactWord(String text, String word) {
-        // Usa boundaries de palavra para evitar "dia" dentro de "diaNielsen"
         Pattern pattern =
                 Pattern.compile("\\b" + Pattern.quote(word) + "\\b", Pattern.CASE_INSENSITIVE);
         return pattern.matcher(text).find();
+    }
+
+    private boolean isTimeInRange(LocalTime now, LocalTime start, LocalTime end) {
+        if (start == null || end == null) return true;
+        // Trata se a faixa cruza a meia-noite (ex.: 22:00 - 06:00) – não é o caso, mas
+        // implementamos
+        // genericamente
+        if (start.isBefore(end) || start.equals(end)) {
+            return !now.isBefore(start) && !now.isAfter(end);
+        } else {
+            // Cruza a meia-noite (ex.: 22:00 - 06:00)
+            return now.isAfter(start) || now.isBefore(end);
+        }
     }
 
     public Optional<AutoResponseRule> getResponseRule(String message) {
@@ -91,22 +119,39 @@ public class AutoResponseService {
         String lowerMsg = message.toLowerCase();
         log.debug("Verificando mensagem: '{}'", lowerMsg);
 
-        // Para evitar falsos positivos, ordena triggers por tamanho (mais específicos primeiro)
+        // Ordena triggers por tamanho (mais específicos primeiro)
         List<Map.Entry<String, AutoResponseRule>> sorted =
                 new ArrayList<>(triggerToRule.entrySet());
         sorted.sort((a, b) -> b.getKey().length() - a.getKey().length());
 
+        LocalTime now = ZonedDateTime.now(BRAZIL_ZONE).toLocalTime();
+
         for (Map.Entry<String, AutoResponseRule> entry : sorted) {
             String trigger = entry.getKey();
-            // Ignora triggers muito curtos (menos de 3 caracteres) – opcional, evita "a", "de",
-            // etc.
+            AutoResponseRule rule = entry.getValue();
+
+            // Ignora triggers muito curtos (opcional)
             if (trigger.length() < 3) {
                 continue;
             }
-            // Verifica se a mensagem contém a palavra/frase exata
+
+            // Verifica se a mensagem contém a palavra exata
             if (containsExactWord(lowerMsg, trigger)) {
-                log.info("✅ Trigger '{}' ativado pela mensagem: '{}'", trigger, lowerMsg);
-                return Optional.of(entry.getValue());
+                // Verifica a restrição de horário
+                if (!isTimeInRange(now, rule.getStartTime(), rule.getEndTime())) {
+                    log.debug(
+                            "Trigger '{}' ativado, mas fora do horário permitido ({} - {})",
+                            trigger,
+                            rule.getStartTime(),
+                            rule.getEndTime());
+                    continue;
+                }
+                log.info(
+                        "✅ Trigger '{}' ativado pela mensagem: '{}' (horário {})",
+                        trigger,
+                        lowerMsg,
+                        now);
+                return Optional.of(rule);
             }
         }
         return Optional.empty();

@@ -245,7 +245,7 @@ public class TelegramFacade {
                                     .chatId(String.valueOf(chatId))
                                     .photo(new InputFile(url))
                                     .caption(legenda)
-                                    .parseMode(HTML) // ← ESSENCIAL
+                                    .parseMode(HTML)
                                     .build();
                     telegramClient.execute(photo);
                 });
@@ -294,7 +294,7 @@ public class TelegramFacade {
                                     .chatId(String.valueOf(chatId))
                                     .animation(new InputFile(animationUrl))
                                     .caption(caption)
-                                    .parseMode("HTML")
+                                    .parseMode(HTML)
                                     .build();
                     telegramClient.execute(animation);
                 });

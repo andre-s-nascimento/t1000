@@ -8,7 +8,12 @@
   },
   "saudacao": {
     "triggers": ["bom dia"],
-    "response": "BOOOOOM DIAAAAAA... VIEEEETNÃÃÃÃÃÃÃÃ! ☀️"
+    "response": "BOOOOOM DIAAAAAA... VIEEEETNÃÃÃÃÃÃÃÃ! ☀️",
+    "animation": "https://imgs.search.brave.com/CEBO11D-MxQFBobMssBkfGCSgJCOy5es8ANN63D-AfQ/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly9tZWRp/YTAuZ2lwaHkuY29t/L21lZGlhL3YxLlky/bGtQVGM1TUdJM05q/RXhhRFkxYkd4MVp6/bDRZbUY1Y1hCd1lY/SnhaVFJrTlRjd2Vt/MXJaWHB2WjNKNWRE/YzVORE54Y3labGNE/MTJNVjluYVdaelgz/TmxZWEpqYUNaamRE/MW4vWEV3eDdOcGdi/RjU3aS8yMDAuZ2lm.gif",
+    "timeRange": {
+      "start": "06:00",
+      "end": "12:00"
+    }
   },
   "tchau": {
     "triggers": ["tchau", "ate logo", "flw", "falou"],

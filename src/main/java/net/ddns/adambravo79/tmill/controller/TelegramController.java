@@ -223,12 +223,27 @@ public class TelegramController implements LongPollingUpdateConsumer {
             Optional<AutoResponseRule> autoResponse = autoResponseService.getResponseRule(texto);
             if (autoResponse.isPresent()) {
                 AutoResponseRule rule = autoResponse.get();
+                String userMention = buildUserMention(message.getFrom());
+                String responseText =
+                        userMention + ", " + (rule.getResponse() != null ? rule.getResponse() : "");
+
+                // Opção: enviar diretamente no privado do usuário (descomente e comente as linhas
+                // abaixo)
+                // long privateChatId = message.getFrom().getId();
+                // if (rule.getAnimation() != null && !rule.getAnimation().isBlank()) {
+                //     telegramFacade.enviarAnimacao(privateChatId, rule.getAnimation(),
+                // responseText);
+                // } else {
+                //     telegramFacade.enviarMensagemHtml(privateChatId, responseText);
+                // }
+                // return;
+
                 if (rule.getAnimation() != null && !rule.getAnimation().isBlank()) {
-                    telegramFacade.enviarAnimacao(chatId, rule.getAnimation(), rule.getResponse());
+                    telegramFacade.enviarAnimacao(chatId, rule.getAnimation(), responseText);
                 } else {
-                    telegramFacade.enviarMensagem(chatId, rule.getResponse());
+                    telegramFacade.enviarMensagemHtml(chatId, responseText);
                 }
-                return; // Impede processamento de outros comandos (opcional)
+                return;
             }
         }
         // ==========================================
@@ -781,5 +796,16 @@ public class TelegramController implements LongPollingUpdateConsumer {
                 .replace(">", "&gt;")
                 .replace("\"", "&quot;")
                 .replace("'", "&#39;");
+    }
+
+    private String buildUserMention(User user) {
+        if (user == null) return "Usuário";
+        String name = user.getFirstName();
+        if (user.getLastName() != null && !user.getLastName().isBlank()) {
+            name += " " + user.getLastName();
+        }
+        // Escapa aspas e caracteres especiais para HTML
+        String escapedName = name.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+        return String.format("<a href=\"tg://user?id=%d\">@%s</a>", user.getId(), escapedName);
     }
 }
